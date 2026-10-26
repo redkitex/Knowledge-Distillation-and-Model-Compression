@@ -1,0 +1,37 @@
+I started with the Mansourian survey. It is huge and maps the whole field,
+so we will need more time with it as a group, but it is the right place to
+learn the basic mechanisms and vocabulary.
+
+Then I went back to where I had first heard of distillation: DeepSeek-R1
+and Qwen3. I find these two very important because they are the state of
+the art today. They are the best of the best and accepted choices, and
+they use distillation in different ways. DeepSeek keeps it simple: their
+big model R1 writes a large set of answers with its reasoning, and smaller
+open models are trained only on that text. The students never see the
+teacher's probabilities, only what it wrote. Qwen's approach is much more
+layered. Their big models go through a long training pipeline of several
+stages, and the small models are not trained that way at all; they are
+distilled from the big ones. This distillation also has two layers. First
+the student learns from the teacher's answers, like DeepSeek. Then the
+student writes its own answers and the teacher corrects them token by
+token. I find Qwen's success with small models very valuable and
+interesting.
+
+After this I wanted another survey, and I found one by Song & Zheng that
+focuses only on on-policy methods. On-policy means the student learns from
+its own answers instead of only copying the teacher's. I think this is a
+topic we have to deal with. DeepSeek shows the classic off-policy way at
+its best, Qwen uses on-policy as its second layer, and I also found a
+valuable write-up on it by researchers at Thinking Machines Lab.
+
+All this may seem far fetched from what the professor offered us if you
+look at the two papers, but what I am checking is only the modern part. It
+all started with those papers. With current research and industrial
+opportunities changing, the same core ideas are still used, but the focal
+point is different.
+
+Making this our focal point would make our efforts relevant and much more
+fun. Computation could be a problem, but there are always cloud options.
+And because the expectation is only a demonstration, I guess even a laptop
+version would be enough. I have an RTX 4060, and I believe we can run the
+small Qwen models on it.
