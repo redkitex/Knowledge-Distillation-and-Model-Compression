@@ -1,0 +1,483 @@
+[mansourian, 2025]
+
+this paper is a big classification of the current situation in KD practices.
+it sorts methods along five independent axes, sections 2-6. one method can
+sit on several axes at once.
+
+section 2 focuses on what is transferred to student from teacher:
+> logit based
+    logits are the outputs of the last layer. softmax over them gives soft
+    labels, one probability per class. the non-argmax probabilities carry
+    "dark knowledge", meaning which classes look alike. temperature softens
+    the softmax so these small values show up; KL divergence measures how
+    far the student's distribution is from the teacher's. hinton 2015 is
+    here.
+> feature based
+    the student copies the teacher's intermediate, hidden layer outputs,
+    not just the final answer. started with fitnets "hints". since teacher
+    and student layers often differ in size, a transformation function maps
+    one onto the other before comparing. attention transfer also starts here.
+> similarity based
+    transfers relations instead of values: how features, channels, samples
+    or classes relate to each other inside the teacher, as pairwise
+    similarity. the student must keep the same structure, not the same
+    numbers. example: FSP, the inner product between two layers.
+
+section 3 splits by when the teacher is trained:
+> offline
+    two stages: teacher is pre-trained, then frozen while the student
+    learns. the most common scheme. downsides: loading the teacher costs
+    memory, the student is capped by the teacher, teacher bias is copied.
+    the only option when the teacher is behind an API, as with LLMs.
+> online
+    one stage: teacher and student or several students train together.
+    often there is no big pre-trained teacher at all; a group of students
+    or an ensemble of branches acts as a "virtual teacher", also called
+    mutual learning.
+    note: online is not the same as on-policy, see song & zheng 2026.
+> self-distillation
+    teacher and student are the same network. born-again networks,
+    furlanello 2018: a fresh copy learns from the trained copy. also:
+    deeper layers teaching shallower ones, earlier epochs teaching later
+    ones. shown to be theoretically linked to label smoothing.
+
+section 4 splits by which technique does the transfer:
+> attention based
+    transfers attention maps, which show where the teacher "looks" in the
+    input, so the student focuses on the same important regions. CAM and
+    grad-CAM can be used as attention sources.
+> adversarial
+    borrows the GAN min-max game. three uses. first, data-free KD: a
+    generator makes fake training data when the real data is unavailable.
+    second, a discriminator tries to tell teacher and student outputs apart
+    and the student learns to fool it. third, adversarial robust
+    distillation: the student matches the teacher on attacked, perturbed
+    inputs.
+> multi-teacher
+    several teachers, knowledge combined by averaging logits, voting or
+    picking one at random. hard part: aggregating well, since each teacher
+    has its own capacity gap to the student.
+> cross-modal
+    a well-labeled modality teaches a poorly-labeled one, for example lidar
+    to rgb. the extra modality is used only in training and can be missing
+    at inference.
+> graph based
+    features or samples become graph vertices, their relations become edges,
+    and this structure is transferred. captures higher-order relations.
+    also covers distilling GNNs themselves.
+> adaptive
+    distillation settings change during training instead of staying fixed:
+    adaptive loss or weights, sample importance, ignoring wrong teacher
+    outputs, lowering teacher influence near the end. teacher assistant,
+    used against the capacity gap, fits here.
+> contrastive
+    uses positives and negatives: the student's feature, the anchor, should
+    be close to the teacher's feature for the same input, the positive, and
+    far from features of other inputs, the negatives.
+
+section 5 splits by the type of input data. mostly task lists, few new
+concepts:
+> 3d input
+    point clouds, voxels, lidar. problems: sparsity and occlusion. tasks:
+    3d detection, segmentation, shape classification, depth, completion.
+> multi-view input
+    several camera views of one scene. typical case: lidar + camera fusion
+    teacher, camera-only student.
+> text input
+    classic NLP tasks like translation, QA, generation and summarization,
+    with BERT-sized models compressed.
+> speech input
+    speech recognition, enhancement, speaker verification. strong focus on
+    real-time and embedded deployment.
+> video input
+    action recognition, video object segmentation. extra concern: keeping
+    the output consistent across frames.
+
+section 6 splits by application area:
+> large language models
+    split into white-box, where teacher logits and hidden states are
+    accessible, and black-box, where only the teacher's text is
+    accessible. white-box: BERT-based and decoder-based LLMs; MiniLLM uses
+    reverse KL; GKD trains on the student's own outputs, mentioned in one
+    sentence only, with no on-policy discussion. black-box: in-context
+    learning, chain of thought, instruction following. also pruning +
+    distillation in industry, such as nvidia minitron.
+> foundation models
+    big pre-trained models reused for many tasks: CLIP, SAM, DINO, vision
+    transformers. used for open-vocabulary and zero-shot tasks.
+> self-supervised learning
+    no labels. the teacher is often a moving average, EMA, of the student,
+    as in BYOL and DINO; two augmentations of one image should give similar
+    embeddings.
+> diffusion models
+    goal is fewer denoising steps at inference. merge several steps into
+    one, or train consistency models that generate in a single step.
+> visual recognition
+    mostly a summary table of task x source x scheme: detection,
+    segmentation, pose, face recognition, medical imaging and more.
+
+[deepseek-ai, 2025]
+
+this paper is mainly about training a reasoning model with RL. distillation
+is a side part: R1 is used as a teacher to make small dense models good at
+reasoning. notes follow arXiv v2, jan 2026, where distillation is spread
+over appendix B.3.3, B.4.3 and F.
+
+where it sits in KD terms:
+> scheme
+    offline. the teacher R1 is trained first and then only used to
+    produce data; it is never updated together with the students.
+> source
+    black-box, sequence-level. no logits or hidden states are used, only
+    the text R1 writes. the paper calls the students "distilled", but in
+    mansourian's terms this is chain of thought distillation.
+> policy
+    off-policy. students only imitate teacher-written answers; they never
+    get feedback on their own outputs. see song & zheng 2026 for why this
+    matters: exposure bias.
+> training method
+    plain SFT, supervised fine-tuning. no RL stage for the students; the
+    authors say adding RL could boost them further but leave it to others.
+
+appendix B.3.3 is the data, what the students learn from:
+> reasoning data
+    about 600k samples. made by rejection sampling: several answers are
+    sampled from an R1 checkpoint for each prompt and only the correct ones
+    are kept. correctness checked by rules or by DeepSeek-V3 acting as a
+    judge. chains of thought with mixed languages, very long paragraphs or
+    code blocks are thrown out.
+> non-reasoning data
+    about 200k samples: writing, factual QA, translation, self-cognition.
+    partly reused from DeepSeek-V3's SFT data. simple queries like
+    greetings get no chain of thought.
+> dataset as a whole
+    about 800k samples, roughly half math and a quarter code. average
+    length about 5,355 tokens, mostly single-turn. human annotators checked
+    the generated reasoning.
+
+appendix B.4.3 is how the students are trained:
+> students
+    six open models used as starting points: qwen2.5-math 1.5B and 7B,
+    qwen2.5 14B and 32B, llama-3.1 8B, llama-3.3 70B instruct.
+> settings
+    fine-tuned on the 800k set for 2-3 epochs, cosine learning rate decay,
+    max context 32,768 tokens, batch size 64. smaller students get a higher
+    learning rate.
+
+appendix F is the results:
+> distilled vs human data
+    students trained on teacher outputs beat students trained directly on
+    human-written data. the paper links this to busbridge et al. 2025,
+    distillation scaling laws.
+> size effect
+    even the 1.5B student beats non-reasoning baselines like GPT-4o on math
+    benchmarks. performance rises steadily with student size.
+    example, AIME 2024 pass@1: GPT-4o 9.3, distill-qwen-7B 55.5,
+    distill-qwen-32B 72.6.
+> distillation vs RL
+    on small models, distilling from R1 works better than running large-scale
+    RL directly on the small model. main takeaway: for a small model it is
+    cheaper and better to learn from a strong teacher than to discover
+    reasoning on its own.
+
+open points worth remembering:
+> what is not tested
+    no logit-based or on-policy variant is tried, so it is unknown how much
+    is lost by using only text.
+> link to my experiment
+    the whole recipe is just "generate, filter, SFT", so it can be shrunk:
+    teacher text from an API or an open dataset, a small student, LoRA.
+
+[song & zheng, 2026]
+
+this paper is a survey of only one corner of KD: on-policy distillation for
+LLMs. its main claim is that off-policy and on-policy are two different
+paradigms, not two variants of the same thing, and that earlier surveys
+missed this. arXiv preprint, april 2026, tencent.
+
+how it relates to the other two papers:
+> vs mansourian
+    mansourian maps all of KD; this paper zooms into one corner of that map.
+    its "teacher access" axis is the same as mansourian's white-box /
+    black-box split, but here it lives one level below the on/off-policy
+    split.
+> vs deepseek
+    R1 distillation is used as the main example of off-policy done well,
+    and the paper spends a section explaining why it works anyway.
+
+section 2 gives the background and the core problem:
+> token-level vs sequence-level
+    token-level KD applies hinton's idea to text: at every position, match
+    the teacher's next-token distribution. it assumes the text so far is
+    error-free. sequence-level KD, kim & rush, matches whole outputs
+    instead; in practice this means training on the teacher's best output.
+> exposure bias
+    the core problem. in off-policy training the student only sees text
+    prefixes from the dataset or teacher; at test time it sees its own
+    prefixes, mistakes included. it never got any signal for those states,
+    so errors compound. framed with imitation learning: DAgger, ross et al.
+    shows the error grows with the square of the length off-policy, but
+    only linearly when training on your own states.
+> f-divergences
+    the family of losses used to compare teacher and student. forward KL is
+    mode-covering: the student spreads mass over everything the teacher
+    might say, which for a small student gives vague, averaged text.
+    reverse KL is mode-seeking: the student commits to the teacher's main
+    answers and ignores the rest. JSD sits in between.
+> unified view
+    every modern on-policy method is one formula with two choices: whose
+    text is sampled, and which divergence is used. GKD mixes dataset and
+    student text with a ratio lambda; lambda 1 is fully on-policy, lambda 0
+    is classic off-policy KD. MiniLLM uses reverse KL on student text.
+
+section 3 is the taxonomy, three orthogonal axes inside on-policy KD:
+> feedback signal
+    what the teacher gives back. logit-based: a full distribution at every
+    token, the densest signal. outcome-based: one score for the whole
+    answer, from a reward model or verifier, closer to RL. self-play: the
+    model judges itself.
+> teacher access
+    white-box: teacher weights available, exact divergence possible, but
+    the teacher must sit in memory next to the student. black-box: API
+    only, so the teacher can only score or rank student outputs.
+    teacher-free: no stronger teacher, the model teaches itself.
+> granularity
+    when the loss is applied. token-level: every step, stable but
+    short-sighted. sequence-level: only at the end, sparse, hard to tell
+    which step was wrong. hybrid: per reasoning step, e.g. process reward
+    models.
+
+section 4 covers white-box on-policy methods:
+> divergence choice
+    progression from one fixed divergence to adaptive ones that change per
+    token or over training. GKD defaults to JSD.
+> token weighting
+    not all tokens matter equally; reasoning steps count more than
+    punctuation, so some methods reweight or select tokens.
+> cross-architecture
+    standard white-box KD needs the same vocabulary for teacher and student.
+    projector-based methods map one model's space onto the other's.
+> capacity gap
+    above roughly a 10x size ratio, the student blurs the teacher's modes
+    together. fix: move the target slowly from the student's own
+    distribution toward the teacher's during training.
+
+section 5 covers black-box and self-distillation:
+> black-box on-policy
+    student writes, teacher can only judge. GAD: a discriminator learns to
+    tell student text from teacher text, and its score is the reward.
+    lion: teacher finds where the student is weak and writes harder
+    prompts.
+> self-play
+    the model competes with its earlier versions, e.g. SPIN. saturates fast
+    because no new information enters the loop.
+> privileged information
+    the way out of saturation: the same model is teacher when it sees the
+    true answer and student when it does not. OPSD does this for math and
+    matches GRPO at 4B and 8B with far fewer tokens, but not at 1.7B.
+
+section 6 is reasoning distillation:
+> chain-of-thought distillation
+    training students on teacher reasoning traces, the black-box route.
+> deepseek-R1
+    named as strictly off-policy: about 800k static samples, plain SFT, no
+    student rollouts, no logits. three reasons it still works: the data is
+    very high quality, the long traces already contain self-correction
+    like "wait, let me reconsider", and math has few valid solution paths
+    to cover. still, the off-policy ceiling is real: later work adds
+    on-policy steps after R1-style SFT and gains more.
+
+section 7 is industry and cost:
+> deployment
+    qwen3 uses on-policy distillation for its small models, with teacher
+    signals possibly combined from several experts. gemma 2 uses
+    distillation during pre-training.
+> compute trade-off
+    on-policy costs several times more per token, because the student must
+    generate text every step. advice: off-policy is enough for general
+    knowledge and style; for reasoning, code and math, the extra cost pays
+    off. recommended recipe: off-policy warm-up first, then on-policy.
+
+section 8 lists open problems:
+> scaling laws
+    busbridge et al. 2025 did this for off-policy; nothing yet for
+    on-policy, where student generation adds a new cost axis.
+> others named
+    uncertainty-aware feedback, agent-level distillation.
+
+worth remembering:
+> limits of this paper
+    preprint, not peer reviewed yet. its critique targets xu et al. 2024 by
+    name, not mansourian. as a survey whose whole point is the on/off split,
+    it has a reason to stress how much earlier surveys missed it.
+> link to my work
+    the recipe in section 7, off-policy first then on-policy, is exactly
+    what qwen3 did, and it can be shrunk to a small student for the
+    experiment.
+
+
+[qwen3_technical_report_2025]
+
+scope:
+> scope of the paper
+    a full technical report on the qwen3 model family: architecture,
+    pre-training on about 36 trillion tokens in 119 languages, a four-stage
+    post-training pipeline and evaluation. distillation is only a small
+    part: section 4.5, page 12, and the comparison in section 4.7.
+    arXiv, may 2025, open weights under apache 2.0.
+> scope for my work
+    not a KD paper. it matters as the first big industrial proof that
+    on-policy distillation works, and as the cleanest side-by-side of
+    off-policy, RL and on-policy from the same starting point. useful for
+    the "where the field is now" part of the talk, not for the core theory.
+
+where it sits in KD terms:
+> scheme
+    offline. teachers qwen3-32B or qwen3-235B-A22B are fully trained
+    first and stay fixed.
+> source
+    white-box, logit-based. the student matches the teacher's logits,
+    which works because teacher and student are the same family and share a
+    tokenizer.
+> policy
+    both, one after the other: off-policy first, then on-policy.
+> family relation
+    strong-to-weak within one model family. same architecture style, only
+    the size changes.
+
+section 4 intro is the post-training pipeline:
+> flagship models
+    the big models go through four stages: long chain-of-thought cold
+    start, reasoning RL, thinking mode fusion, general RL. stages 1-2 build
+    thinking ability, stages 3-4 add the non-thinking mode.
+> lightweight models
+    the small models skip that pipeline and are distilled from the
+    flagships instead: dense 0.6B, 1.7B, 4B, 8B, 14B and the 30B-A3B MoE.
+    note: figure 1 seems to list 30B-A3B as a flagship while section 4.5
+    lists it as a student; the paper is not consistent here.
+> why distill
+    running four stages for every small model is expensive. distillation
+    gives better scores, keeps the thinking / non-thinking control, and
+    needs about 1/10 of the GPU hours.
+
+section 4.5 is strong-to-weak distillation:
+> phase 1, off-policy
+    the student is trained on teacher outputs written in both thinking and
+    non-thinking mode. this is the deepseek-R1 recipe. goal: basic reasoning
+    and the ability to switch modes.
+> phase 2, on-policy
+    prompts are sampled, the student writes its own answer in either mode,
+    and the student's logits are pulled toward the teacher's logits on
+    that same text by minimizing KL divergence. this is the GKD / song &
+    zheng recipe. which KL direction is used is not stated.
+
+section 4.7 is the comparison, the key result:
+> setup
+    one 8B checkpoint after phase 1 is continued in two ways: with RL, or
+    with on-policy distillation. math and code queries only.
+> results
+    AIME 2024: off-policy 55.0, plus RL 67.6, plus on-policy 74.4.
+    AIME 2025: 42.8, 55.5, 65.5. MATH500: 92.4, 94.8, 97.0.
+    LiveCodeBench v5: 42.0, 52.9, 60.3. GPQA-Diamond: 55.6, 61.3, 63.3.
+    GPU hours: RL 17,920, on-policy 1,800, about 10x less.
+> pass@64
+    pass@64 means at least one of 64 tries is right. on AIME it goes up
+    with on-policy distillation, 90.0 to 93.3 on 2024, but RL leaves it
+    unchanged. the authors read this as distillation widening the student's
+    exploration space, while RL only sharpens what the model can already
+    do.
+
+distilled small models vs baselines, tables 17-19:
+> mostly better
+    qwen3-4B in thinking mode beats deepseek-R1-distill-qwen-14B on AIME
+    2024 and 2025, at less than a third of the size.
+> not always
+    qwen3-8B loses to R1-distill-qwen-32B on AIME 2024; qwen3-0.6B is well
+    below R1-distill-qwen-1.5B. the authors' claim that small models beat
+    larger baselines holds broadly, not everywhere.
+
+worth remembering:
+> limits of this paper
+    a company report, not peer reviewed. the RL settings and how GPU hours
+    were measured are not given, so the 10x number cannot be checked. the
+    comparison covers math and code only.
+> the bigger point
+    qwen does not pick between off-policy and on-policy; it stacks them.
+    off-policy builds the base cheaply, on-policy fixes what the student
+    gets wrong on its own text.
+> link to my work
+    the same two-step recipe can be shrunk for the experiment: a small
+    same-family student, off-policy SFT first, then a short on-policy phase,
+    compared on a math benchmark.
+
+[lu & thinking machines lab, 2025]
+
+scope:
+> who
+    thinking machines lab is an AI company founded in 2025 by mira murati,
+    former CTO of openai. its product tinker is an API for fine-tuning
+    open models without running your own cluster.
+> what this is
+    a blog post, "on-policy distillation", kevin lu et al., october 2025.
+    not a paper and not peer reviewed. it made the term popular.
+> scope for my work
+    the clearest intuition for on/off-policy, and a practical recipe. good
+    for explaining the idea in the talk; numbers should be treated as a
+    company demo.
+
+main argument:
+> the three-way table
+    SFT: off-policy, dense signal. RL: on-policy, sparse signal, only a few
+    bits per episode. on-policy distillation: on-policy and dense, the
+    best of both.
+> the chess picture
+    like a chess engine grading every move you made in your own game,
+    instead of only telling you at the end whether you won.
+
+how it works:
+> loss
+    per-token reverse KL between student and teacher, computed on text the
+    student sampled. mode-seeking: the student sticks to what the teacher
+    thinks is likely.
+> discount zero
+    each token is graded only on itself, not on what comes after.
+    longer-horizon versions did not help in their tests.
+> cheap to add
+    almost a one-line change to an RL script that already has a KL term:
+    swap the reference model for the teacher. no reward model needed.
+
+experiments:
+> math reasoning
+    student qwen3-8B-base, teacher qwen3-32B. after off-policy SFT on 400k
+    prompts: 60% on AIME 2024. on-policy distillation on top reaches about
+    70% in about 150 steps. reaching the same with more SFT would need
+    about 2M prompts, estimated at roughly 9 to 30x more compute.
+> qwen3 replication
+    reproduces the qwen3 claim that on-policy distillation beats RL at a
+    fraction of the cost, but got 70%, not qwen's 74.4%.
+> personalization
+    an assistant trained on internal company documents learns the
+    knowledge but forgets how to follow instructions: IF-eval drops from
+    85% to 45%. a short on-policy distillation phase from the original
+    model brings it back to 83% while keeping the new knowledge.
+> continual learning
+    even SFT on the model's own outputs slowly breaks it. on-policy
+    distillation from a fixed teacher does not, which makes it a candidate
+    method for continual learning.
+
+limits:
+> stated by the authors
+    simple demonstrations, not full studies. one model family only. the
+    teacher's behavior must already be somewhat reachable by the student,
+    otherwise SFT or mid-training is needed first. reverse KL cannot teach
+    tokens the student almost never produces. cost numbers partly
+    extrapolated.
+
+worth remembering:
+> the bigger point
+    same message as qwen3: SFT first to give the student a base, then
+    on-policy distillation to fix the student's own mistakes.
+> link to my work
+    the recipe is small enough to try at small scale, and the
+    personalization case shows a use of distillation beyond compression:
+    repairing a model after fine-tuning.
