@@ -1,0 +1,54 @@
+I wanted to find out if going in the LLM direction is realistic for our project,
+with the hardware and time we have. The short answer is yes. I trained a small
+language model from a bigger one on Kaggle's free GPUs, a teacher and a student,
+and it worked in both training modes we talked about, off-policy and on-policy.
+Both models are from the Qwen3 family: the teacher is Qwen3-4B with 4 billion
+parameters and the student is Qwen3-0.6B with 0.6 billion parameters. Both runs
+finished without running out of memory, and I measured how long each mode takes.
+So we can now plan the real experiments with actual numbers instead of guesses.
+
+I chose the biggest models that still fit on Kaggle during training. What limits
+us is GPU memory. Kaggle gives every user two T4 GPUs with 15 GB each and 30 GPU
+hours per week for free. Training needs much more memory than just running a
+model, because the student's gradients and optimizer state also have to be
+stored. The teacher uses about 8 GB on the first GPU, and the student uses about
+11 GB on the second one during training. A bigger teacher or a bigger student
+would not fit, so Qwen3-4B as teacher and Qwen3-0.6B as student is the maximum
+the free tier allows, and it works. We can still go smaller if we want, for
+example with Hugging Face's SmolLM models for agent-style tasks. Then both the
+teacher and the student have to be SmolLM models, because they need to share the
+same tokenizer.
+
+For the data I used GSM8K, a public set of grade school math word problems where
+every answer is a single number, so grading is automatic. It is only the test
+task for now and can easily be swapped for another one.
+
+The tools are all from Hugging Face. The transformers library loads the models,
+the datasets library loads the data, and the TRL library has ready-made trainers
+for distillation. One of them, GKDTrainer, implements the GKD paper by Agarwal
+and others from Google DeepMind, published at ICLR 2024. GKD is one of the first
+papers on on-policy distillation for language models: the student writes its own
+answer and the teacher corrects it token by token, instead of the student only
+copying the teacher's answers. In TRL, switching between off-policy and
+on-policy is a single setting. The idea became widely known in 2025, when the
+Qwen3 team used it to train their small models and Thinking Machines Lab wrote a
+popular blog post about it. The Kaggle test uses a short custom training loop
+that follows the same idea, because it puts the teacher and the student on
+separate GPUs. Everything here is open source, so together with Kaggle the whole
+setup is free.
+
+You can find the notebook here:
+https://www.kaggle.com/code/marlanbranda/distillation-on-gsm8k-with-qwens
+Please don't ask me questions about the code for now. I gave the commands and
+Claude wrote the code, so I don't know the details of how it works yet. It is
+also not a final result, just a few test runs to see what is possible.
+
+I am also pushing eval_gsm8k.py into the code folder. It measures how accurate a
+model is on the dataset before any distillation, so we have a baseline to
+compare against later. It can still be made faster, and I am planning to do that
+in the coming days. The smaller Qwen models run on my own PC, so these baseline
+checks don't need Kaggle.
+
+Last note: Claude suggests using LoRA, which trains only small add-on matrices
+instead of the whole student. That saves most of the training memory, so we
+could move to bigger models on the same free GPUs.
