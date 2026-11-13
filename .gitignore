@@ -1,0 +1,23 @@
+# environments and tool caches
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+.pytest_cache/
+*.egg-info/
+
+# weights and caches: stored outside git, location recorded in run_log.csv
+checkpoints/
+cache/
+*.safetensors
+*.pt
+
+# secrets
+.env
+kaggle.json
+
+# local leftovers from v1
+headroom_results/
+
+# Quarto build output
+.quarto/
+report/*_files/
