@@ -4,9 +4,7 @@ import gc
 from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# Import the cleaning function and the prompt from the data module
 from kd.data import prompt_ids
-# Import the function to extract the number
 from kd.answer_extraction import extract_last_number, gold_answer
 
 @torch.no_grad()
@@ -35,7 +33,7 @@ def generate_batch(model, tokenizer, device, prompts, eos_ids, max_new_tokens, d
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 max_new_tokens=max_new_tokens,
-                do_sample=False,          # Greedy: deterministic evaluation
+                do_sample=False,
                 pad_token_id=pad_id,
                 use_cache=True,
             )
@@ -43,7 +41,7 @@ def generate_batch(model, tokenizer, device, prompts, eos_ids, max_new_tokens, d
         if len(prompts) == 1:
             raise
         
-        # Lifesaver: if the batch is too large, split it in half
+        # If the batch is too large, it splits it in half
         gc.collect()
         torch.cuda.empty_cache()
         mid = len(prompts) // 2
@@ -51,7 +49,7 @@ def generate_batch(model, tokenizer, device, prompts, eos_ids, max_new_tokens, d
                 + generate_batch(model, tokenizer, device, prompts[mid:], eos_ids, max_new_tokens, dtype))
 
     responses = []
-    # We trim the padding that remains after the end-of-sequence token
+    # Trims the padding that remains after the end-of-sequence token
     for row in out[:, width:].tolist():
         end = len(row)
         for j, tok in enumerate(row):
@@ -75,7 +73,7 @@ def evaluate_model(model_name_or_path, device, problems, batch_size, max_new_tok
     for p in model.parameters():
         p.requires_grad_(False)
 
-    # Identify the tokens that indicate the model has finished responding
+    # Identifies the tokens that indicate the model has finished responding
     eos = model.generation_config.eos_token_id
     eos_ids = set(eos if isinstance(eos, list) else [eos])
     # In Qwen, <|im_end|> is often used to close messages
@@ -87,7 +85,7 @@ def evaluate_model(model_name_or_path, device, problems, batch_size, max_new_tok
     for batch_start in range(0, len(problems), batch_size):
         batch = problems[batch_start: batch_start + batch_size]
         
-        # Important: we use prompt_ids from kd.data (the same as in training)
+        # Prompt_ids from kd.data are used
         prompts = [prompt_ids(tokenizer, ex["question"]) for ex in batch]
         
         responses = generate_batch(model, tokenizer, device, prompts, eos_ids, max_new_tokens, dtype)
@@ -95,7 +93,7 @@ def evaluate_model(model_name_or_path, device, problems, batch_size, max_new_tok
         for ex, resp_ids in zip(batch, responses):
             response_text = tokenizer.decode(resp_ids, skip_special_tokens=True)
             
-            # We use our dedicated functions from kd.answer_extraction
+            # Functions from kd.answer_extraction are used
             predicted = extract_last_number(response_text)
             expected = gold_answer(ex["answer"])
             
@@ -128,7 +126,7 @@ def evaluate_model(model_name_or_path, device, problems, batch_size, max_new_tok
         "records": records,
     }
 
-    # Clean up VRAM before returning the result (crucial for Kaggle)
+    # Clean up VRAM before returning the result
     del model
     del tokenizer
     gc.collect()

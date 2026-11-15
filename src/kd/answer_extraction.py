@@ -31,7 +31,7 @@ def gold_answer(answer_field: str):
     """
     parts = answer_field.split("####")
     
-    # If for some reason it doesn't have the standard format, we search the entire text
+    # If for some reason it doesn't have the standard format, the entire text is searched
     if len(parts) < 2:
         return extract_last_number(answer_field)
         
