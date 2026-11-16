@@ -266,7 +266,77 @@ def test_compare_arms_skips_missing_seeds(fake_results):
     del runs["teacher_s3"]
     out = compare_arms(runs, "onpolicy", "teacher")
     assert [r["seed"] for r in out["per_seed"]] == [1, 2]
-    assert compare_arms(runs, "human", "teacher")["across_seeds"] is None
+
+
+def test_compare_arms_raises_instead_of_returning_nothing(fake_results):
+    runs = load_runs(fake_results)
+    with pytest.raises(ValueError, match="human"):
+        compare_arms(runs, "human", "teacher")
+
+
+def test_compare_arms_against_an_unseeded_reference(fake_results):
+    # "did distillation beat the untrained student?": every seed vs the same ref_student0
+    qs = [f"q{i}" for i in range(40)]
+    write_run(fake_results, "ref_student0", [rec(q, i < 25, 1 if i < 25 else 0) for i, q in enumerate(qs)])
+    runs = load_runs(fake_results)
+    out = compare_arms(runs, "onpolicy", "ref_student0")
+    assert [(r["run_a"], r["run_b"]) for r in out["per_seed"]] == [
+        ("onpolicy_s1", "ref_student0"), ("onpolicy_s2", "ref_student0"), ("onpolicy_s3", "ref_student0")]
+    assert [r["diff"] for r in out["per_seed"]] == pytest.approx([6 / 40, 7 / 40, 8 / 40])
+    assert all(r["n"] == 40 for r in out["per_seed"])
+
+
+def test_compare_two_references_only_once(fake_results):
+    qs = [f"q{i}" for i in range(40)]
+    write_run(fake_results, "ref_student0", [rec(q, i < 25, 1 if i < 25 else 0) for i, q in enumerate(qs)])
+    runs = load_runs(fake_results)
+    out = compare_arms(runs, "ref_teacher", "ref_student0")
+    assert len(out["per_seed"]) == 1
+    assert out["per_seed"][0]["seed"] is None
+    assert out["per_seed"][0]["diff"] == pytest.approx(15 / 40)
+    assert out["across_seeds"]["n_seeds"] == 1
+
+
+def test_empty_predictions_file_is_skipped(fake_results, capsys):
+    (fake_results / "human_s1").mkdir()
+    (fake_results / "human_s1" / "predictions.jsonl").write_text("", encoding="utf-8")
+    runs = load_runs(fake_results)
+    assert "human_s1" not in runs
+    assert "skipping human_s1" in capsys.readouterr().out
+
+
+def test_half_written_file_gives_a_clear_error(tmp_path):
+    path = tmp_path / "predictions.jsonl"
+    path.write_text(json.dumps(rec("q1", True, 1)) + "\n" + '{"question": "q2", "corr', encoding="utf-8")
+    with pytest.raises(ValueError, match="line 2"):
+        stats.load_predictions(path)
+
+
+def test_pilot_run_on_fewer_questions_does_not_crash(fake_results):
+    # pilot / smoke runs only cover part of the test set, ref_teacher covers all of it
+    qs = [f"q{i}" for i in range(10)]
+    write_run(fake_results, "pilot_onpolicy_s3", [rec(q, i < 5, 1 if i < 5 else 0) for i, q in enumerate(qs)])
+    runs = load_runs(fake_results)
+    rows = {r["run_id"]: r for r in results_table(runs)}
+    pilot = rows["pilot_onpolicy_s3"]
+    assert pilot["n"] == 10
+    assert pilot["agreement_n"] == 10                 # only the 10 shared questions
+    assert pilot["agreement_with_teacher"] == 0.5
+    assert rows["onpolicy_s1"]["agreement_n"] == 40
+
+
+def test_agreement_with_no_shared_questions():
+    out = agreement([rec("a", True, 1)], [rec("b", True, 1)])
+    assert out["n"] == 0 and out["agreement"] is None
+
+
+def test_align_shared_only_keeps_common_questions_in_order():
+    a = [rec("q3", True), rec("q1", False), rec("q9", True)]
+    b = [rec("q1", True), rec("q2", True), rec("q3", False)]
+    a2, b2 = align(a, b, shared_only=True)
+    assert [r["question"] for r in a2] == ["q3", "q1"]
+    assert [r["question"] for r in b2] == ["q3", "q1"]
+    assert [r["correct"] for r in b2] == [False, True]
 
 
 def test_command_line_prints_and_writes_csv(fake_results, tmp_path, capsys, monkeypatch):

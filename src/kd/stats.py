@@ -65,18 +65,32 @@ def load_predictions(path):
     """Read one predictions.jsonl file (one JSON object per line)."""
     records = []
     with open(path, encoding="utf-8") as f:
-        for line in f:
+        for line_no, line in enumerate(f, start=1):
             line = line.strip()
-            if line:
+            if not line:
+                continue
+            try:
                 records.append(json.loads(line))
+            except json.JSONDecodeError as e:
+                # usually a Kaggle session that died while writing the file
+                raise ValueError(f"{path}, line {line_no}: not valid JSON ({e.msg}). "
+                                 "Was the evaluation interrupted?") from e
     return records
 
 
 def load_runs(runs_dir="results/runs"):
-    """Return {run_id: records} for every run folder that has predictions."""
+    """Return {run_id: records} for every run folder that has predictions.
+
+    Folders without predictions.jsonl, or with an empty one (a run that is
+    still going), are skipped with a message instead of breaking the table.
+    """
     runs = {}
     for pred_file in sorted(Path(runs_dir).glob("*/predictions.jsonl")):
-        runs[pred_file.parent.name] = load_predictions(pred_file)
+        records = load_predictions(pred_file)
+        if records:
+            runs[pred_file.parent.name] = records
+        else:
+            print(f"skipping {pred_file.parent.name}: predictions.jsonl is empty")
     return runs
 
 
@@ -88,16 +102,23 @@ def parse_run_id(run_id):
     return run_id, None
 
 
-def align(records_a, records_b):
+def align(records_a, records_b, shared_only=False):
     """Put two runs in the same question order so they can be compared.
 
-    Both runs must contain exactly the same questions. If they do not, the
-    comparison would not be paired, so we stop instead of guessing.
+    By default both runs must contain exactly the same questions, otherwise
+    we stop instead of guessing. With shared_only=True only the questions
+    that appear in both runs are kept (in the order of run A). That is
+    needed when a pilot or smoke run on 300 questions is compared with a
+    reference evaluated on the full test set. Callers report how many
+    questions were actually used.
     """
     by_key_b = {question_key(r): r for r in records_b}
     keys_a = [question_key(r) for r in records_a]
     if len(set(keys_a)) != len(keys_a) or len(by_key_b) != len(records_b):
         raise ValueError("a run contains the same question twice")
+    if shared_only:
+        kept = [(r, by_key_b[k]) for r, k in zip(records_a, keys_a) if k in by_key_b]
+        return [a for a, _ in kept], [b for _, b in kept]
     if set(keys_a) != set(by_key_b):
         raise ValueError("the two runs do not contain the same questions")
     return list(records_a), [by_key_b[k] for k in keys_a]
@@ -219,12 +240,17 @@ def agreement(student_records, teacher_records):
     the teacher's mistake, which plain accuracy cannot show.
 
     If either model gave no number, the pair counts as "not agreeing".
+    Only the questions both runs answered are used (e.g. a 300-question
+    pilot run against the full-set teacher); "n" says how many that was.
     """
-    student, teacher = align(student_records, teacher_records)
+    student, teacher = align(student_records, teacher_records, shared_only=True)
     agree = [same_number(final_answer(s), final_answer(t)) for s, t in zip(student, teacher)]
     teacher_wrong = [i for i, t in enumerate(teacher) if not t["correct"]]
 
     n = len(agree)
+    if n == 0:
+        return {"n": 0, "agreement": None, "ci_low": None, "ci_high": None,
+                "n_teacher_wrong": 0, "agreement_when_teacher_wrong": None}
     k = sum(agree)
     low, high = wilson_ci(k, n)
     out = {"n": n, "agreement": k / n, "ci_low": low, "ci_high": high,
@@ -278,9 +304,12 @@ def results_table(runs, teacher_run="ref_teacher"):
         row = {"run_id": run_id, "arm": arm, "seed": seed}
         row.update(summarise_run(runs[run_id]))
         if teacher is not None and run_id != teacher_run:
-            row["agreement_with_teacher"] = agreement(runs[run_id], teacher)["agreement"]
+            agr = agreement(runs[run_id], teacher)
+            row["agreement_with_teacher"] = agr["agreement"]
+            row["agreement_n"] = agr["n"]
         else:
             row["agreement_with_teacher"] = None
+            row["agreement_n"] = None
         rows.append(row)
     return rows
 
@@ -300,30 +329,59 @@ def arm_table(rows, metric="accuracy"):
     return table
 
 
+def find_run(runs, arm, seed):
+    """Run id for an arm and seed: 'onpolicy_s2' for trained arms, or the
+    plain name ('ref_student0', 'ref_teacher') for references, which are
+    evaluated once and have no seed. None if neither exists."""
+    if f"{arm}_s{seed}" in runs:
+        return f"{arm}_s{seed}"
+    if arm in runs:
+        return arm
+    return None
+
+
 def compare_arms(runs, arm_a, arm_b, seeds=(1, 2, 3)):
     """Paired difference arm_a - arm_b, seed by seed, plus mean and range.
 
-    Example: compare_arms(runs, "onpolicy", "teacher"). Each seed gets its
-    own bootstrap interval. The bootstrap only covers the choice of test
-    questions, not training noise, which is why the per-seed spread is
-    reported next to it (never only the best seed).
+    Examples: compare_arms(runs, "onpolicy", "teacher") or, against a
+    reference, compare_arms(runs, "onpolicy", "ref_student0"); a reference
+    has no seed, so every seed of arm_a is compared with the same run.
+    Each seed gets its own bootstrap interval. The bootstrap only covers the
+    choice of test questions, not training noise, which is why the per-seed
+    spread is reported next to it (never only the best seed).
+
+    Raises ValueError if not a single seed could be compared, so a typo in
+    an arm name does not silently return an empty result.
     """
     per_seed = []
+    done = set()
     for seed in seeds:
-        id_a, id_b = f"{arm_a}_s{seed}", f"{arm_b}_s{seed}"
-        if id_a not in runs or id_b not in runs:
+        id_a, id_b = find_run(runs, arm_a, seed), find_run(runs, arm_b, seed)
+        if id_a is None or id_b is None or id_a == id_b:
             continue
-        a, b = align(runs[id_a], runs[id_b])
+        if (id_a, id_b) in done:
+            # two references (no seeds): compare them once, not once per seed
+            continue
+        done.add((id_a, id_b))
+        if id_a == arm_a and id_b == arm_b:
+            seed = None
+        a, b = align(runs[id_a], runs[id_b], shared_only=True)
+        if not a:
+            continue
         diff, (low, high) = paired_bootstrap_diff_ci(
             [r["correct"] for r in a], [r["correct"] for r in b])
         per_seed.append({
-            "seed": seed, "diff": diff, "ci_low": low, "ci_high": high,
+            "seed": seed, "run_a": id_a, "run_b": id_b, "n": len(a),
+            "diff": diff, "ci_low": low, "ci_high": high,
             # questions only one of the two runs got right
             "only_a_correct": sum(x["correct"] and not y["correct"] for x, y in zip(a, b)),
             "only_b_correct": sum(y["correct"] and not x["correct"] for x, y in zip(a, b)),
             "significant": low > 0 or high < 0,
         })
-    summary = seed_summary(r["diff"] for r in per_seed) if per_seed else None
+    if not per_seed:
+        raise ValueError(f"no run pairs found for {arm_a!r} vs {arm_b!r}; "
+                         f"available runs: {', '.join(sorted(runs))}")
+    summary = seed_summary(r["diff"] for r in per_seed)
     return {"arm_a": arm_a, "arm_b": arm_b, "per_seed": per_seed, "across_seeds": summary}
 
 

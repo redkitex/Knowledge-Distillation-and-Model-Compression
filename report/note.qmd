@@ -56,7 +56,7 @@ How to use this file (E1 assembles it, everyone writes their own section).
 
 *TODO (T1, E2).*
 
-**Statistics.** We report every accuracy with a 95% Wilson interval [@wilson1927probable]. All runs answer the same 1,319 test questions, so we compare arms with paired differences [@miller2024errorbars] and a paired bootstrap over questions (10,000 resamples, fixed seed) [@efron1993bootstrap]. This interval covers the choice of test questions but not training noise, so we show each of the three seeds separately with their mean and range, and never select the best one. As a fidelity measure in the sense of @stanton2021does, we also report how often the student's final answer matches the teacher's, both overall and on the questions the teacher gets wrong.
+**Statistics.** We report every accuracy with a 95% Wilson interval [@wilson1927probable; @brown2001interval]. All runs answer the same 1,319 test questions, so we compare arms with paired differences [@miller2024errorbars] and a paired bootstrap over questions (10,000 resamples, fixed seed) [@efron1993bootstrap]. This interval covers the choice of test questions but not training noise, so we show each of the three seeds separately with their mean and range, and never select the best one. As a fidelity measure in the sense of @stanton2021does, we also report how often the student's final answer matches the teacher's, both overall and on the questions the teacher gets wrong.
 
 <!-- E1: shorten the paragraph above if T1/E2 already cover part of it. -->
 
