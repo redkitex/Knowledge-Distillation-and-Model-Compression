@@ -1,0 +1,90 @@
+---
+title: "Whose text should a small model practise on? Distilling Qwen3-4B into Qwen3-0.6B on GSM8K"
+subtitle: "AAI2 Practical Project B3: Knowledge Distillation and Model Compression"
+author:
+  - TODO names of all six members
+date: last-modified
+bibliography: references.bib
+number-sections: true
+format:
+  pdf:
+    documentclass: article
+    papersize: a4
+    fontsize: 10pt
+    geometry: margin=2cm
+    colorlinks: true
+---
+
+<!--
+How to use this file (E1 assembles it, everyone writes their own section).
+
+- Render from the repo root:   quarto render report/note.qmd
+- Limit: 3 to 4 pages without the references. The page budget per section
+  is in the comment under each heading. If a section runs over, cut it there
+  instead of shrinking the font.
+- Write prose. Do not paste slide bullet points here.
+- Every number must come from a file in results/ (tables from
+  results/tables/, figures from results/figures/). No numbers typed by hand.
+- Cite with [@key], keys from report/references.bib. Mark claims from papers
+  vs claims from our runs clearly in the text.
+- Insert a figure like this:
+  ![Accuracy per arm with 95% Wilson intervals.](../results/figures/fig1_accuracy.png){width=80%}
+- Delete the TODO line of your section when you replace it.
+-->
+
+# Problem and motivation
+
+<!-- Writer: T3 · about 0.4 pages -->
+
+*TODO (T3): why distil language models; DeepSeek-R1 trains on teacher text only, Qwen3 adds an on-policy stage; our research question.*
+
+# Theoretical background
+
+<!-- Writers: T2 (soft targets, temperature, hard vs soft labels), T1 (KL directions, exposure bias) · about 0.75 pages -->
+
+*TODO (T2, T1).*
+
+# Relevant literature
+
+<!-- Writer: E2 · about 0.5 pages. Group papers by the question they answer, not one paragraph per paper. -->
+
+*TODO (E2).*
+
+# Experimental design
+
+<!-- Writers: T1 (arms, loss, equal updates, seeds), E2 (evaluation protocol, answer rule) · about 0.6 pages -->
+
+*TODO (T1, E2).*
+
+**Statistics.** We report every accuracy with a 95% Wilson interval [@wilson1927probable; @brown2001interval]. All runs answer the same 1,319 test questions, so we compare arms with paired differences [@miller2024errorbars] and a paired bootstrap over questions (10,000 resamples, fixed seed) [@efron1993bootstrap]. This interval covers the choice of test questions but not training noise, so we show each of the three seeds separately with their mean and range, and never select the best one. As a fidelity measure in the sense of @stanton2021does, we also report how often the student's final answer matches the teacher's, both overall and on the questions the teacher gets wrong.
+
+<!-- E1: shorten the paragraph above if T1/E2 already cover part of it. -->
+
+# Results
+
+<!-- Writers: E1 (accuracy per arm, paired differences, seeds), E3 (length, truncation, agreement, size and speed) · about 0.75 pages. Numbers only from results/tables/. -->
+
+*TODO after the "Results in" check (Nov 24): table of accuracy per arm and seed with CIs; figure of paired differences; length and truncation per arm.*
+
+# Interpretation
+
+<!-- Writer: E1, from the interpretation meeting on Nov 25 · about 0.4 pages -->
+
+*TODO (E1): what the results show and what they do not. Say plainly when a difference is not significant, and discuss answer length as an alternative explanation.*
+
+# Limitations
+
+<!-- Writer: E3 · about 0.25 pages -->
+
+*TODO (E3): one dataset, one model pair, three seeds, temperature fixed at 1, possible GSM8K contamination.*
+
+# Conclusion
+
+<!-- Writer: T3 · about 0.1 pages -->
+
+*TODO (T3).*
+
+# References {.unnumbered}
+
+::: {#refs}
+:::
