@@ -45,6 +45,21 @@ TODO(T1):
     loads fp16 anyway). Currently saved as trained (fp32).
   - Confirm the on-policy re-seeding gives identical rollouts when a step is
     retried after an out-of-memory error (it should on the same GPU).
+
+T1 review (Nov 18), changes on top of the draft:
+  - Stretch arm "mixed" (B8.1): exactly train.mixed_lambda * questions_per_step
+    questions of every step get a student rollout, the rest their cached
+    teacher answer. Which positions is a hash of (seed, step, position), so it
+    is reproducible and independent of every RNG. Same question order as all
+    other arms. Not one of the four main arms; scripts/20_train.py accepts it.
+  - Out-of-memory retry gets a fresh GradScaler (same scale). Without it, an
+    OOM after scaler.unscale_() -- e.g. when AdamW allocates its state at the
+    first optimizer step, the largest single allocation -- made the retry fail
+    with "unscale_() has already been called".
+  - The student's train/eval mode is restored in a finally block after rollouts.
+  - Vocabulary sizes are compared once at the start. The loss still slices to
+    the shared size (briefing pack 2.4 allows it), but a mismatch is now printed
+    and recorded in the summary (vocab_sliced_to) instead of happening silently.
 """
 
 import contextlib
@@ -60,7 +75,8 @@ import torch
 from kd import data
 from kd.losses import distillation_loss
 
-ARMS = data.TRAINING_ARMS
+ARMS = data.TRAINING_ARMS          # the four main arms
+STRETCH_ARMS = ("mixed",)          # B8.1, only with spare quota
 
 
 # ---------------------------------------------------------------------------
@@ -99,6 +115,30 @@ def question_ids_hash(question_ids):
 def sampling_seed(seed, step):
     """Seed for on-policy sampling at one step, derived from (seed, step) only."""
     return int(hashlib.sha256(f"sampling:{seed}:{step}".encode()).hexdigest()[:8], 16)
+
+
+def check_mixed_lambda(lmbda, questions_per_step):
+    """Number of rollouts per step for the mixed arm; lambda * step size must be whole."""
+    if lmbda is None:
+        raise ValueError("arm 'mixed' needs train.mixed_lambda in the config (e.g. 0.5)")
+    if not 0.0 <= lmbda <= 1.0:
+        raise ValueError(f"train.mixed_lambda must be in [0, 1], got {lmbda}")
+    k = round(lmbda * questions_per_step)
+    if abs(lmbda * questions_per_step - k) > 1e-9:
+        raise ValueError(f"train.mixed_lambda * questions_per_step = {lmbda * questions_per_step} "
+                         f"is not a whole number; use multiples of 1/{questions_per_step}")
+    return k
+
+
+def onpolicy_positions(seed, step, n, k):
+    """Which k of the n positions of a step get a student rollout (mixed arm).
+
+    A hash of (seed, step, position): reproducible, independent of every RNG,
+    and different from step to step. Exactly k positions are True.
+    """
+    ranked = sorted(range(n), key=lambda p: hashlib.sha256(f"mix:{seed}:{step}:{p}".encode()).hexdigest())
+    chosen = set(ranked[:k])
+    return [p in chosen for p in range(n)]
 
 
 # ---------------------------------------------------------------------------
@@ -161,35 +201,56 @@ def generate_rollouts(student, tokenizer, prompts, cfg, seed):
     gen = cfg["generation"]
     was_training = student.training
     student.eval()
-    with autocast(device, cfg):
-        out = student.generate(
-            input_ids=input_ids,
-            attention_mask=attention,
-            max_new_tokens=gen["max_new_tokens"],
-            do_sample=True,
-            temperature=gen["sampling"]["temperature"],
-            top_p=gen["sampling"]["top_p"],
-            top_k=gen["sampling"]["top_k"],
-            pad_token_id=pad,
-            eos_token_id=sorted(data.stop_token_ids(tokenizer)),
-            use_cache=True,
-        )
-    student.train(was_training)
+    try:
+        with autocast(device, cfg):
+            out = student.generate(
+                input_ids=input_ids,
+                attention_mask=attention,
+                max_new_tokens=gen["max_new_tokens"],
+                do_sample=True,
+                temperature=gen["sampling"]["temperature"],
+                top_p=gen["sampling"]["top_p"],
+                top_k=gen["sampling"]["top_k"],
+                pad_token_id=pad,
+                eos_token_id=sorted(data.stop_token_ids(tokenizer)),
+                use_cache=True,
+            )
+    finally:  # also after an out-of-memory error, so a retry starts from the same mode
+        student.train(was_training)
     return [row.tolist() for row in out[:, width:]]
 
 
 def build_step_sequences(arm, examples, tokenizer, cfg, max_seq_len, *,
-                         teacher_cache=None, student=None, gen_seed=None):
-    """The training sequences of one step. The ONLY place where arms differ in data."""
+                         teacher_cache=None, student=None, gen_seed=None, rollout_flags=None):
+    """The training sequences of one step. The ONLY place where arms differ in data.
+
+    rollout_flags (mixed arm only): True where the position gets a student
+    rollout, False where it gets its cached teacher answer.
+    """
     if arm == "onpolicy":
-        prompts = [data.prompt_ids(tokenizer, ex.question) for ex in examples]
-        sources = generate_rollouts(student, tokenizer, prompts, cfg, gen_seed)
-    elif arm == "teacher":
-        sources = [teacher_cache[ex.question_id] for ex in examples]
-    else:  # human, ref_hardlabel: the cleaned dataset solution
-        sources = [None] * len(examples)
-    return [data.build_for_arm(arm, tokenizer, ex, src, max_seq_len=max_seq_len)
-            for ex, src in zip(examples, sources)]
+        rollout_flags = [True] * len(examples)
+    elif arm == "mixed":
+        if rollout_flags is None or len(rollout_flags) != len(examples):
+            raise ValueError("arm 'mixed' needs one rollout flag per example")
+    else:
+        rollout_flags = [False] * len(examples)
+
+    rollouts = iter(())
+    if any(rollout_flags):
+        prompts = [data.prompt_ids(tokenizer, ex.question)
+                   for ex, f in zip(examples, rollout_flags) if f]
+        rollouts = iter(generate_rollouts(student, tokenizer, prompts, cfg, gen_seed))
+
+    sequences = []
+    for ex, on in zip(examples, rollout_flags):
+        if on:
+            seq_arm, src = "onpolicy", next(rollouts)
+        elif arm in ("teacher", "mixed"):
+            seq_arm, src = "teacher", teacher_cache[ex.question_id]
+        else:  # human, ref_hardlabel: the cleaned dataset solution
+            seq_arm, src = arm, None
+        sequences.append(data.build_for_arm(seq_arm, tokenizer, ex, src, max_seq_len=max_seq_len))
+    return sequences
 
 
 # ---------------------------------------------------------------------------
@@ -252,20 +313,53 @@ def free_memory():
         torch.cuda.empty_cache()
 
 
+def fresh_scaler(old, enabled):
+    """A new GradScaler that keeps the old one's loss scale.
+
+    After an out-of-memory error between scaler.unscale_() and scaler.update()
+    the old scaler still marks the optimizer as unscaled, and the retry would
+    fail with "unscale_() has already been called on this optimizer".
+    """
+    return torch.amp.GradScaler("cuda", init_scale=old.get_scale() if enabled else 65536.0,
+                                enabled=enabled)
+
+
+def check_vocab(student, teacher):
+    """Compare the output vocabulary sizes once. Returns the sliced size, or None if equal.
+
+    kd.losses slices both logits to the shared size (briefing pack 2.4 allows
+    it); this makes a mismatch visible in the console and in the run summary.
+    """
+    if teacher is None or not hasattr(student, "get_output_embeddings"):
+        return None
+    vs = student.get_output_embeddings().weight.shape[0]
+    vt = teacher.get_output_embeddings().weight.shape[0]
+    if vs == vt:
+        return None
+    shared = min(vs, vt)
+    print(f"[train] warning: student logits have {vs} entries, teacher {vt}; "
+          f"the loss uses the first {shared} (recorded as vocab_sliced_to)")
+    return shared
+
+
 # ---------------------------------------------------------------------------
 # 5. The loop (models passed in, so tests can use tiny ones)
 # ---------------------------------------------------------------------------
 
 def train_loop(cfg, arm, seed, out_dir, student, teacher, tokenizer, pool, teacher_cache=None):
     """Train `student` in place for one arm and seed. Returns a summary dict."""
-    if arm not in ARMS:
-        raise ValueError(f"unknown arm {arm!r}; expected one of {ARMS}")
+    if arm not in ARMS + STRETCH_ARMS:
+        raise ValueError(f"unknown arm {arm!r}; expected one of {ARMS + STRETCH_ARMS}")
     if arm != "ref_hardlabel" and teacher is None:
         raise ValueError(f"arm {arm!r} needs the teacher model")
-    if arm == "teacher" and teacher_cache is None:
-        raise ValueError("arm 'teacher' needs the teacher cache (scripts/10_cache_teacher_sequences.py)")
+    if arm in ("teacher", "mixed") and teacher_cache is None:
+        raise ValueError(f"arm {arm!r} needs the teacher cache (scripts/10_cache_teacher_sequences.py)")
 
     tcfg = cfg["train"]
+    n_rollouts = None
+    if arm == "mixed":
+        n_rollouts = check_mixed_lambda(tcfg.get("mixed_lambda"), tcfg["questions_per_step"])
+    vocab_sliced_to = check_vocab(student, teacher)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -298,13 +392,16 @@ def train_loop(cfg, arm, seed, out_dir, student, teacher, tokenizer, pool, teach
             t_step = time.time()
             examples = [by_id[q] for q in qids]
 
+            flags = (onpolicy_positions(seed, step, len(examples), n_rollouts)
+                     if arm == "mixed" else None)
+
             for attempt in range(tcfg["oom_retries"] + 1):
                 try:
                     t_gen = time.time()
                     seqs = build_step_sequences(
                         arm, examples, tokenizer, cfg, max_seq_len,
                         teacher_cache=teacher_cache, student=student,
-                        gen_seed=sampling_seed(seed, step),
+                        gen_seed=sampling_seed(seed, step), rollout_flags=flags,
                     )
                     gen_seconds = time.time() - t_gen
                     loss, n_tokens = train_step(seqs, arm, student, teacher, tokenizer,
@@ -312,6 +409,7 @@ def train_loop(cfg, arm, seed, out_dir, student, teacher, tokenizer, pool, teach
                     break
                 except torch.cuda.OutOfMemoryError:
                     optimizer.zero_grad(set_to_none=True)
+                    scaler = fresh_scaler(scaler, use_scaler)
                     free_memory()
                     if attempt == tcfg["oom_retries"]:
                         raise RuntimeError(f"step {step}: out of memory {attempt + 1} times. "
@@ -333,9 +431,10 @@ def train_loop(cfg, arm, seed, out_dir, student, teacher, tokenizer, pool, teach
                 "lr": optimizer.param_groups[0]["lr"],
                 "elapsed_s": round(time.time() - t_start, 2),
                 "step_time_s": round(time.time() - t_step, 2),
-                "generation_s": round(gen_seconds, 2) if arm == "onpolicy" else 0.0,
+                "generation_s": round(gen_seconds, 2) if arm in ("onpolicy", "mixed") else 0.0,
                 "question_ids_hash": question_ids_hash(qids),
                 "n_sequences": len(seqs),
+                "n_rollouts": sum(s.arm == "onpolicy" for s in seqs),
                 "n_unfinished": unfinished,
                 "n_truncated": truncated,
             }
@@ -353,6 +452,8 @@ def train_loop(cfg, arm, seed, out_dir, student, teacher, tokenizer, pool, teach
         "unfinished_sequences": totals["unfinished"],
         "truncated_sequences": totals["truncated"],
         "train_seconds": round(time.time() - t_start, 1),
+        "mixed_lambda": tcfg.get("mixed_lambda") if arm == "mixed" else None,
+        "vocab_sliced_to": vocab_sliced_to,
     }
 
 
@@ -389,7 +490,7 @@ def run_training(cfg, arm, seed, out_dir):
     pool = data.load_pool(cfg["data"]["pool_size"], cfg["data"]["pool_seed"])
 
     teacher_cache = None
-    if arm == "teacher":
+    if arm in ("teacher", "mixed"):
         teacher_cache = data.load_teacher_cache(
             cfg["data"]["teacher_sequences"], expected_ids=[ex.question_id for ex in pool])
 

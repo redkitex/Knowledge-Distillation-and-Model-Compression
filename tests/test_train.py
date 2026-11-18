@@ -170,4 +170,130 @@ def test_missing_inputs_fail_early(setup, tmp_path):
     with pytest.raises(ValueError, match="teacher cache"):
         train_loop(tiny_cfg(), "teacher", 1, tmp_path, tiny_model(0), tiny_model(1), tokenizer, pool)
     with pytest.raises(ValueError, match="unknown arm"):
-        train_loop(tiny_cfg(), "mixed", 1, tmp_path, tiny_model(0), None, tokenizer, pool)
+        train_loop(tiny_cfg(), "bogus", 1, tmp_path, tiny_model(0), None, tokenizer, pool)
+
+
+# --------------------------------------------------------------------------
+# 3. T1 review additions: mixed lambda (stretch B8.1), OOM retry, vocabulary
+# --------------------------------------------------------------------------
+
+from kd.train import check_mixed_lambda, check_vocab, onpolicy_positions  # noqa: E402
+
+
+@pytest.mark.parametrize("lmbda,k", [(0.0, 0), (0.25, 1), (0.5, 2), (0.75, 3), (1.0, 4)])
+def test_onpolicy_positions_exact_count_and_reproducible(lmbda, k):
+    n_rollouts = check_mixed_lambda(lmbda, 4)
+    assert n_rollouts == k
+    flags = [tuple(onpolicy_positions(1, step, 4, k)) for step in range(1, 30)]
+    assert all(sum(f) == k for f in flags)
+    assert flags == [tuple(onpolicy_positions(1, step, 4, k)) for step in range(1, 30)]
+    if 0 < k < 4:
+        assert len(set(flags)) > 1          # the positions change from step to step
+
+
+def test_mixed_lambda_must_be_set_and_whole():
+    with pytest.raises(ValueError, match="mixed_lambda"):
+        check_mixed_lambda(None, 4)
+    with pytest.raises(ValueError, match="whole number"):
+        check_mixed_lambda(0.3, 4)
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        check_mixed_lambda(1.5, 4)
+
+
+def test_mixed_arm_trains_with_exact_share_and_the_same_order(setup, tmp_path):
+    tokenizer, pool, cache = setup
+    human = tmp_path / "human"
+    mixed = tmp_path / "mixed"
+    train_loop(tiny_cfg(), "human", 1, human, tiny_model(0), tiny_model(1), tokenizer, pool)
+    summary = train_loop(tiny_cfg(mixed_lambda=0.5), "mixed", 1, mixed, tiny_model(0),
+                         tiny_model(1), tokenizer, pool, teacher_cache=cache)
+    rows = read_log(mixed / "train_log.jsonl")
+    assert summary["mixed_lambda"] == 0.5 and summary["steps"] == 2
+    assert [r["n_rollouts"] for r in rows] == [2, 2]
+    assert ([r["question_ids_hash"] for r in rows]
+            == [r["question_ids_hash"] for r in read_log(human / "train_log.jsonl")])
+
+
+def test_mixed_arm_needs_lambda_and_cache(setup, tmp_path):
+    tokenizer, pool, cache = setup
+    with pytest.raises(ValueError, match="teacher cache"):
+        train_loop(tiny_cfg(mixed_lambda=0.5), "mixed", 1, tmp_path, tiny_model(0),
+                   tiny_model(1), tokenizer, pool)
+    with pytest.raises(ValueError, match="mixed_lambda"):
+        train_loop(tiny_cfg(), "mixed", 1, tmp_path, tiny_model(0), tiny_model(1),
+                   tokenizer, pool, teacher_cache=cache)
+
+
+def test_mixed_step_sources_follow_the_flags(setup):
+    from kd.train import build_step_sequences
+    tokenizer, pool, cache = setup
+    flags = [True, False, False, True]
+    seqs = build_step_sequences("mixed", pool[:4], tokenizer, tiny_cfg(), 400,
+                                teacher_cache=cache, student=tiny_model(0),
+                                gen_seed=sampling_seed(1, 1), rollout_flags=flags)
+    assert [s.arm for s in seqs] == ["onpolicy", "teacher", "teacher", "onpolicy"]
+    assert [s.question_id for s in seqs] == [ex.question_id for ex in pool[:4]]
+
+
+def test_out_of_memory_retries_the_same_step_with_a_fresh_scaler(setup, tmp_path, monkeypatch):
+    import kd.train as train_mod
+    tokenizer, pool, _ = setup
+    real_step = train_mod.train_step
+    seen_scalers, calls = [], {"n": 0}
+
+    def flaky_step(seqs, arm, student, teacher, tok, optimizer, scaler, cfg):
+        calls["n"] += 1
+        seen_scalers.append(scaler)
+        if calls["n"] == 1:
+            raise torch.cuda.OutOfMemoryError("simulated")
+        return real_step(seqs, arm, student, teacher, tok, optimizer, scaler, cfg)
+
+    monkeypatch.setattr(train_mod, "train_step", flaky_step)
+    summary = train_loop(tiny_cfg(), "human", 1, tmp_path, tiny_model(0), tiny_model(1),
+                         tokenizer, pool)
+    assert summary["oom_retries"] == 1 and summary["steps"] == 2
+    assert calls["n"] == 3                        # step 1 twice, step 2 once
+    assert seen_scalers[1] is not seen_scalers[0]  # the retry got a new scaler
+
+
+def test_out_of_memory_too_often_stops_the_run(setup, tmp_path, monkeypatch):
+    import kd.train as train_mod
+    tokenizer, pool, _ = setup
+
+    def always_oom(*args, **kwargs):
+        raise torch.cuda.OutOfMemoryError("simulated")
+
+    monkeypatch.setattr(train_mod, "train_step", always_oom)
+    with pytest.raises(RuntimeError, match="instead of skipping"):
+        train_loop(tiny_cfg(), "human", 1, tmp_path, tiny_model(0), tiny_model(1), tokenizer, pool)
+
+
+def test_rollouts_restore_train_mode_after_an_error(setup, monkeypatch):
+    from kd.train import generate_rollouts
+    tokenizer, pool, _ = setup
+    student = tiny_model(0)
+    student.train()
+
+    def broken_generate(*args, **kwargs):
+        raise torch.cuda.OutOfMemoryError("simulated")
+
+    monkeypatch.setattr(student, "generate", broken_generate)
+    prompts = [data.prompt_ids(tokenizer, ex.question) for ex in pool[:2]]
+    with pytest.raises(torch.cuda.OutOfMemoryError):
+        generate_rollouts(student, tokenizer, prompts, tiny_cfg(), seed=1)
+    assert student.training
+
+
+def test_vocab_mismatch_is_reported():
+    from transformers import Qwen3Config, Qwen3ForCausalLM
+
+    def model(vocab):
+        torch.manual_seed(0)
+        return Qwen3ForCausalLM(Qwen3Config(vocab_size=vocab, hidden_size=32, intermediate_size=64,
+                                            num_hidden_layers=1, num_attention_heads=4,
+                                            num_key_value_heads=2, head_dim=8,
+                                            max_position_embeddings=64))
+
+    assert check_vocab(model(64), model(64)) is None
+    assert check_vocab(model(64), model(80)) == 64
+    assert check_vocab(model(64), None) is None   # ref_hardlabel has no teacher
