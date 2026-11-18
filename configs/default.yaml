@@ -23,6 +23,7 @@ data:
 train:
   questions_per_step: 4           # one pass over 2000 questions = 500 steps
   epochs: 1
+  max_steps: null                 # null = the full pass; the pilot uses 20_train.py --max-steps 100
   optimizer: adamw
   lr: 1.0e-5                      # pilot decides (halve it if accuracy drops)
   grad_clip: 1.0
