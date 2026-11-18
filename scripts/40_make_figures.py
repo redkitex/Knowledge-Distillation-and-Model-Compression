@@ -6,47 +6,13 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-try:
-    from kd.stats import paired_bootstrap_diff_ci, wilson_ci  # type: ignore
-except (ImportError, AttributeError):
-
-    def wilson_ci(k: int, n: int, z: float = 1.959963984540054) -> Tuple[float, float]:
-        if n <= 0:
-            return (0.0, 0.0)
-        p = k / n
-        denom = 1.0 + (z**2) / n
-        center = (p + (z**2) / (2.0 * n)) / denom
-        half = (z * math.sqrt((p * (1.0 - p) + (z**2) / (4.0 * n)) / n)) / denom
-        return (max(0.0, center - half), min(1.0, center + half))
-
-    def paired_bootstrap_diff_ci(
-        correct_a: List[int],
-        correct_b: List[int],
-        n_boot: int = 2000,
-        seed: int = 42,
-    ) -> Tuple[float, float, float]:
-        arr_a = np.asarray(correct_a, dtype=float)
-        arr_b = np.asarray(correct_b, dtype=float)
-        if len(arr_a) == 0 or len(arr_a) != len(arr_b):
-            return (0.0, 0.0, 0.0)
-        diffs = arr_a - arr_b
-        mean_diff = float(np.mean(diffs))
-        rng = np.random.default_rng(seed)
-        n = len(diffs)
-        boot_means = np.empty(n_boot, dtype=float)
-        for i in range(n_boot):
-            idx = rng.integers(0, n, size=n)
-            boot_means[i] = np.mean(diffs[idx])
-        ci_low, ci_high = np.percentile(boot_means, [2.5, 97.5])
-        return (mean_diff, float(ci_low), float(ci_high))
-
+from kd.stats import paired_bootstrap_diff_ci, wilson_ci
 
 ARMS_ORDER = ["human", "teacher", "onpolicy", "ref_hardlabel"]
 ARM_LABELS = {
@@ -71,6 +37,13 @@ MODEL_PARAMS_B = {
     "onpolicy": 0.6,
     "ref_hardlabel": 0.6,
 }
+
+
+def read_json(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+    with path.open("r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -110,6 +83,23 @@ def parse_arm_and_seed(run_id: str) -> Tuple[str, Optional[int]]:
     return (run_id, None)
 
 
+def compute_step_time(train_log: List[Dict[str, Any]]) -> float:
+    """Compute mean seconds per step from elapsed_s in train_log.jsonl."""
+    elapsed = [
+        float(r["elapsed_s"])
+        for r in train_log
+        if "elapsed_s" in r and r["elapsed_s"] is not None
+    ]
+    if not elapsed:
+        return 0.0
+    # Handle both cumulative elapsed_s and per-step elapsed_s
+    if len(elapsed) > 1 and all(elapsed[i] <= elapsed[i + 1] for i in range(len(elapsed) - 1)):
+        steps = [int(r.get("step", i + 1)) for i, r in enumerate(train_log)]
+        total_steps = max(steps[-1], len(elapsed), 1)
+        return float(elapsed[-1] / total_steps)
+    return float(np.mean(elapsed))
+
+
 def collect_runs(results_dir: Path, max_new_tokens: int = 512) -> Dict[str, Dict[str, Any]]:
     run_log = read_run_log(results_dir / "run_log.csv")
     runs_dir = results_dir / "runs"
@@ -125,6 +115,8 @@ def collect_runs(results_dir: Path, max_new_tokens: int = 512) -> Dict[str, Dict
         run_folder = runs_dir / run_id
         preds = read_jsonl(run_folder / "predictions.jsonl")
         train_log = read_jsonl(run_folder / "train_log.jsonl")
+        eval_summary = read_json(run_folder / "eval_summary.json")
+        run_info = read_json(run_folder / "run_info.json")
         log_row = run_log.get(run_id, {})
 
         if preds:
@@ -139,14 +131,9 @@ def collect_runs(results_dir: Path, max_new_tokens: int = 512) -> Dict[str, Dict
             qid = p.get("question_id", p.get("id", p.get("idx", idx)))
             is_corr = int(bool(p.get("correct", p.get("is_correct", False))))
             correct_flags.append(is_corr)
-            extracted_answers[qid] = p.get(
-                "pred_answer", p.get("extracted_answer", p.get("prediction"))
-            )
-            tok_len = p.get("num_tokens", p.get("completion_tokens", p.get("length")))
-            if tok_len is None:
-                text = str(p.get("generated_text", p.get("response", p.get("output", ""))))
-                tok_len = len(text.split())
-            tok_len = int(tok_len)
+            extracted_answers[qid] = p.get("extracted_answer")
+
+            tok_len = int(p.get("n_response_tokens", 0))
             lengths.append(tok_len)
 
             is_trunc = p.get("truncated")
@@ -159,6 +146,11 @@ def collect_runs(results_dir: Path, max_new_tokens: int = 512) -> Dict[str, Dict
         if n_eval > 0:
             acc = k_corr / n_eval
             ci_low, ci_high = wilson_ci(k_corr, n_eval)
+        elif "accuracy" in eval_summary and eval_summary["accuracy"] is not None:
+            acc = float(eval_summary["accuracy"])
+            n_eval = int(eval_summary.get("n_examples") or eval_summary.get("n_eval") or 1319)
+            k_corr = int(round(acc * n_eval))
+            ci_low, ci_high = wilson_ci(k_corr, n_eval)
         elif "accuracy" in log_row and log_row["accuracy"] not in ("", None):
             acc = float(log_row["accuracy"])
             n_eval = int(log_row.get("n_eval") or 1319)
@@ -167,16 +159,9 @@ def collect_runs(results_dir: Path, max_new_tokens: int = 512) -> Dict[str, Dict
         else:
             continue
 
-        eval_sec = float(log_row.get("eval_time_s") or log_row.get("eval_seconds") or 0.0)
-        step_sec = float(log_row.get("sec_per_step") or log_row.get("step_time_s") or 0.0)
-        if step_sec == 0.0 and train_log:
-            step_times = [
-                float(r["step_time_s"])
-                for r in train_log
-                if "step_time_s" in r and r["step_time_s"] is not None
-            ]
-            if step_times:
-                step_sec = float(np.mean(step_times))
+        eval_sec = float(eval_summary.get("elapsed_seconds") or 0.0)
+        gpu_hours = float(run_info.get("gpu_hours") or log_row.get("gpu_hours") or 0.0)
+        step_sec = compute_step_time(train_log)
 
         data[run_id] = {
             "run_id": run_id,
@@ -194,6 +179,7 @@ def collect_runs(results_dir: Path, max_new_tokens: int = 512) -> Dict[str, Dict
             "train_log": train_log,
             "eval_time_s": eval_sec,
             "step_time_s": step_sec,
+            "gpu_hours": gpu_hours,
         }
 
     teacher_ans = data.get("ref_teacher", {}).get("extracted_answers", {})
@@ -286,6 +272,7 @@ def write_summary_tables(data: Dict[str, Dict[str, Any]], tables_dir: Path) -> N
         accs = [r["accuracy"] * 100 for r in runs]
         step_secs = [r["step_time_s"] for r in runs if r["step_time_s"] > 0]
         eval_secs = [r["eval_time_s"] for r in runs if r["eval_time_s"] > 0]
+        gpu_hrs = [r["gpu_hours"] for r in runs if r["gpu_hours"] > 0]
         comp_rows.append(
             {
                 "model_or_arm": arm,
@@ -293,6 +280,7 @@ def write_summary_tables(data: Dict[str, Dict[str, Any]], tables_dir: Path) -> N
                 "compression_ratio": "1.0x" if arm == "ref_teacher" else "6.7x (0.6B vs 4B)",
                 "mean_accuracy_pct": f"{np.mean(accs):.2f}",
                 "train_sec_per_step": f"{np.mean(step_secs):.2f}" if step_secs else "-",
+                "gpu_hours": f"{np.mean(gpu_hrs):.2f}" if gpu_hrs else "-",
                 "eval_time_sec": f"{np.mean(eval_secs):.1f}" if eval_secs else "-",
             }
         )
@@ -384,7 +372,7 @@ def plot_fig2_paired_diffs(data: Dict[str, Dict[str, Any]], figures_dir: Path) -
                 pooled_a.extend(ca)
                 pooled_b.extend(cb)
         if pooled_a:
-            diff, low, high = paired_bootstrap_diff_ci(pooled_a, pooled_b)
+            diff, (low, high) = paired_bootstrap_diff_ci(pooled_a, pooled_b)
             results_list.append((label, diff * 100, low * 100, high * 100))
 
     fig, ax = plt.subplots(figsize=(7.5, 4.2))
