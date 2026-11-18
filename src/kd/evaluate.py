@@ -123,7 +123,7 @@ def evaluate_model(model_name_or_path, device, problems, batch_size, max_new_tok
         "n": n,
         "correct": correct,
         "accuracy": round(accuracy, 4),
-        "mean_response_tokens": round(sum(r["response_tokens"] for r in records) / max(n, 1), 1),
+        "mean_response_tokens": round(sum(r["n_response_tokens"] for r in records) / max(n, 1), 1),
         "truncated_fraction": round(sum(r["truncated"] for r in records) / max(n, 1), 4),
         "elapsed_seconds": round(elapsed_total, 1),
         "records": records,
