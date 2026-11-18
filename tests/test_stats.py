@@ -16,6 +16,7 @@ from kd.stats import (
     align,
     arm_table,
     compare_arms,
+    fairness_check,
     load_runs,
     paired_bootstrap_diff_ci,
     parse_run_id,
@@ -337,6 +338,81 @@ def test_align_shared_only_keeps_common_questions_in_order():
     assert [r["question"] for r in a2] == ["q3", "q1"]
     assert [r["question"] for r in b2] == ["q3", "q1"]
     assert [r["correct"] for r in b2] == [False, True]
+
+
+# --------------------------------------------------------------------------
+# "It's fair" check on train_log.jsonl
+# --------------------------------------------------------------------------
+
+def write_train_log(runs_dir, run_id, hashes, tokens=100, first_step=1):
+    folder = runs_dir / run_id
+    folder.mkdir(parents=True, exist_ok=True)
+    with open(folder / "train_log.jsonl", "w", encoding="utf-8") as f:
+        for i, h in enumerate(hashes):
+            row = {"step": first_step + i, "loss": 0.5, "tokens": tokens, "lr": 1e-5,
+                   "elapsed_s": 2.0 * (i + 1), "question_ids_hash": h}
+            f.write(json.dumps(row) + "\n")
+
+
+ARMS = ["pilot_human", "pilot_teacher", "pilot_onpolicy", "pilot_ref_hardlabel"]
+
+
+def test_fairness_check_passes_for_identical_order(tmp_path):
+    for arm, tok in zip(ARMS, (100, 260, 220, 100)):     # lengths may differ, order may not
+        write_train_log(tmp_path, arm, ["a", "b", "c"], tokens=tok)
+    report = fairness_check(tmp_path, ARMS)
+    assert report["fair"], report["problems"]
+    assert report["runs"]["pilot_teacher"]["total_tokens"] == 780
+    assert report["runs"]["pilot_human"]["n_steps"] == 3
+
+
+def test_fairness_check_finds_a_different_order(tmp_path):
+    write_train_log(tmp_path, "pilot_human", ["a", "b", "c", "d"])
+    write_train_log(tmp_path, "pilot_onpolicy", ["a", "c", "b", "d"])   # shared RNG bug
+    report = fairness_check(tmp_path, ["pilot_human", "pilot_onpolicy"])
+    assert not report["fair"]
+    assert report["mismatched_steps"] == [2, 3]
+    assert "first at step 2" in report["problems"][0]
+
+
+def test_fairness_check_finds_a_skipped_step(tmp_path):
+    write_train_log(tmp_path, "pilot_human", ["a", "b", "c"])
+    folder = tmp_path / "pilot_onpolicy"
+    folder.mkdir()
+    rows = [{"step": 1, "question_ids_hash": "a"}, {"step": 3, "question_ids_hash": "c"}]  # step 2 skipped (OOM)
+    (folder / "train_log.jsonl").write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
+    report = fairness_check(tmp_path, ["pilot_human", "pilot_onpolicy"])
+    assert not report["fair"]
+    text = " ".join(report["problems"])
+    assert "not consecutive" in text
+    assert "different number of steps" in text
+
+
+def test_fairness_check_missing_hash_and_missing_file(tmp_path):
+    write_train_log(tmp_path, "pilot_human", ["a"])
+    (tmp_path / "pilot_teacher").mkdir()
+    (tmp_path / "pilot_teacher" / "train_log.jsonl").write_text('{"step": 1}', encoding="utf-8")
+    report = fairness_check(tmp_path, ["pilot_human", "pilot_teacher"])
+    assert any("no question_ids_hash" in p for p in report["problems"])
+    with pytest.raises(FileNotFoundError):
+        fairness_check(tmp_path, ["pilot_human", "pilot_onpolicy"])
+    with pytest.raises(ValueError):
+        fairness_check(tmp_path, ["pilot_human"])
+
+
+def test_fairness_command_line_exit_code(tmp_path, monkeypatch, capsys):
+    write_train_log(tmp_path, "pilot_human", ["a", "b"])
+    write_train_log(tmp_path, "pilot_teacher", ["a", "b"])
+    monkeypatch.setattr("sys.argv", ["stats", "--runs-dir", str(tmp_path), "--fair", "pilot_human", "pilot_teacher"])
+    stats.main()
+    assert "FAIR" in capsys.readouterr().out
+
+    write_train_log(tmp_path, "pilot_onpolicy", ["b", "a"])
+    monkeypatch.setattr("sys.argv", ["stats", "--runs-dir", str(tmp_path), "--fair", "pilot_human", "pilot_onpolicy"])
+    with pytest.raises(SystemExit) as exc:
+        stats.main()
+    assert exc.value.code == 1
+    assert "NOT FAIR" in capsys.readouterr().out
 
 
 def test_command_line_prints_and_writes_csv(fake_results, tmp_path, capsys, monkeypatch):

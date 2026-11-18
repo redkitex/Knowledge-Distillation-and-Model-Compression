@@ -13,10 +13,12 @@ What is in here:
   - agreement: how often the student's final answer matches the teacher's
   - accuracy_by_length: accuracy for short vs long answers
   - results_table / compare_arms: the tables used in the note and the slides
+  - fairness_check: the pilot's "It's fair" check on the training logs
 
-Quick look at all finished runs from the repo root:
-    python -m kd.stats
+From the repo root:
+    python -m kd.stats                                   # table of all evaluated runs
     python -m kd.stats --out results/tables/results_table.csv
+    python -m kd.stats --fair pilot_human pilot_teacher pilot_onpolicy pilot_ref_hardlabel
 """
 
 import argparse
@@ -61,8 +63,8 @@ def n_tokens(rec):
     return rec.get("response_tokens")
 
 
-def load_predictions(path):
-    """Read one predictions.jsonl file (one JSON object per line)."""
+def read_jsonl(path):
+    """Read a .jsonl file (one JSON object per line)."""
     records = []
     with open(path, encoding="utf-8") as f:
         for line_no, line in enumerate(f, start=1):
@@ -74,8 +76,13 @@ def load_predictions(path):
             except json.JSONDecodeError as e:
                 # usually a Kaggle session that died while writing the file
                 raise ValueError(f"{path}, line {line_no}: not valid JSON ({e.msg}). "
-                                 "Was the evaluation interrupted?") from e
+                                 "Was the run interrupted?") from e
     return records
+
+
+def load_predictions(path):
+    """Read one predictions.jsonl file."""
+    return read_jsonl(path)
 
 
 def load_runs(runs_dir="results/runs"):
@@ -385,6 +392,77 @@ def compare_arms(runs, arm_a, arm_b, seeds=(1, 2, 3)):
     return {"arm_a": arm_a, "arm_b": arm_b, "per_seed": per_seed, "across_seeds": summary}
 
 
+# ---------------------------------------------------------------------------
+# "It's fair" check (pilot gate)
+# ---------------------------------------------------------------------------
+
+def fairness_check(runs_dir, run_ids):
+    """Check that several training runs saw the same questions in the same order.
+
+    Reads results/runs/<run_id>/train_log.jsonl for each run (one row per
+    optimizer step with "step" and "question_ids_hash", as T1 logs them) and
+    checks three things:
+      1. no step is missing or repeated in any run (no skipped updates),
+      2. all runs have the same number of steps,
+      3. at every step, all runs have the same question_ids_hash.
+    Tokens per step are allowed to differ (answers have different lengths
+    per arm); they are only reported.
+
+    Example for the pilot:
+        fairness_check("results/runs", ["pilot_human", "pilot_teacher",
+                                         "pilot_onpolicy", "pilot_ref_hardlabel"])
+    Returns {"fair": bool, "problems": [...], "runs": {run_id: {...}}}.
+    """
+    if len(run_ids) < 2:
+        raise ValueError("give at least two runs to compare")
+
+    problems = []
+    hashes = {}     # run_id -> {step: hash}
+    info = {}
+    for run_id in run_ids:
+        path = Path(runs_dir) / run_id / "train_log.jsonl"
+        if not path.exists():
+            raise FileNotFoundError(f"{path} not found")
+        rows = read_jsonl(path)
+        if not rows:
+            problems.append(f"{run_id}: train_log.jsonl is empty")
+            hashes[run_id] = {}
+            info[run_id] = {"n_steps": 0}
+            continue
+
+        steps = [r["step"] for r in rows]
+        expected = list(range(steps[0], steps[0] + len(steps)))
+        if steps != expected:
+            problems.append(f"{run_id}: steps are not consecutive "
+                            f"(missing or repeated steps, e.g. a skipped update)")
+        if any("question_ids_hash" not in r for r in rows):
+            problems.append(f"{run_id}: some steps have no question_ids_hash")
+
+        hashes[run_id] = {r["step"]: r.get("question_ids_hash") for r in rows}
+        info[run_id] = {
+            "n_steps": len(rows),
+            "first_step": steps[0],
+            "last_step": steps[-1],
+            "total_tokens": sum(r.get("tokens") or 0 for r in rows),
+            "elapsed_s": rows[-1].get("elapsed_s"),
+        }
+
+    n_steps = {run_id: i["n_steps"] for run_id, i in info.items()}
+    if len(set(n_steps.values())) > 1:
+        detail = ", ".join(f"{k}={v}" for k, v in n_steps.items())
+        problems.append(f"different number of steps: {detail}")
+
+    all_steps = sorted(set().union(*(h.keys() for h in hashes.values())))
+    bad_steps = [s for s in all_steps
+                 if len({hashes[r].get(s) for r in run_ids}) > 1]
+    if bad_steps:
+        problems.append(f"question order differs at {len(bad_steps)} step(s), "
+                        f"first at step {bad_steps[0]}")
+
+    return {"fair": not problems, "problems": problems, "runs": info,
+            "mismatched_steps": bad_steps}
+
+
 def write_csv(rows, path):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -405,7 +483,23 @@ def main():
     parser = argparse.ArgumentParser(description="Summarise every evaluated run.")
     parser.add_argument("--runs-dir", default="results/runs")
     parser.add_argument("--out", help="optional CSV path for the per-run table")
+    parser.add_argument("--fair", nargs="+", metavar="RUN_ID",
+                        help="instead of the table, check that these training runs "
+                             "saw the same questions in the same order")
     args = parser.parse_args()
+
+    if args.fair:
+        report = fairness_check(args.runs_dir, args.fair)
+        for run_id, i in report["runs"].items():
+            print(f"{run_id:<24} steps={i['n_steps']:<6} tokens={i.get('total_tokens', '-')}")
+        if report["fair"]:
+            print("\nFAIR: same number of steps and the same questions at every step.")
+        else:
+            print("\nNOT FAIR:")
+            for p in report["problems"]:
+                print(f"  - {p}")
+            raise SystemExit(1)
+        return
 
     runs = load_runs(args.runs_dir)
     if not runs:
