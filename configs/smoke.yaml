@@ -19,6 +19,7 @@ data:
 train:
   questions_per_step: 4
   epochs: 1
+  max_steps: null
   optimizer: adamw
   lr: 1.0e-5
   grad_clip: 1.0
