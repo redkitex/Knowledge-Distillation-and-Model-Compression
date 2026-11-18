@@ -5,6 +5,8 @@ Usage (from the repo root):
     python scripts/20_train.py --config configs/smoke.yaml --arm human --seed 1
     python scripts/20_train.py --config configs/default.yaml --arm human --seed 3 \
         --run-id pilot_human_s3 --account T3 --max-steps 100
+    python scripts/20_train.py --config configs/default.yaml --arm mixed --seed 1 \
+        --mixed-lambda 0.5 --run-id mixed050_s1      # stretch B8.1
 
 This script does the bookkeeping around a run, so every run is recorded the
 same way:
@@ -42,7 +44,8 @@ from pathlib import Path
 
 import yaml
 
-ARMS = ("human", "teacher", "onpolicy", "ref_hardlabel")
+ARMS = ("human", "teacher", "onpolicy", "ref_hardlabel",
+        "mixed")  # stretch B8.1 only: needs --mixed-lambda
 RUN_LOG = Path("results/run_log.csv")
 RUN_LOG_COLUMNS = [
     "run_id", "arm", "seed", "account", "started_utc", "ended_utc", "gpu_hours",
@@ -100,6 +103,9 @@ def main() -> None:
     parser.add_argument("--account", default="", help="whose Kaggle account runs this, e.g. T3")
     parser.add_argument("--max-steps", type=int, default=None,
                         help="stop after this many steps (pilot only); overrides train.max_steps")
+    parser.add_argument("--mixed-lambda", type=float, default=None,
+                        help="arm mixed only (stretch B8.1): share of each step from student "
+                             "rollouts, e.g. 0.25, 0.5 or 0.75; the rest are teacher answers")
     args = parser.parse_args()
 
     config_path = Path(args.config)
@@ -108,6 +114,10 @@ def main() -> None:
         if args.max_steps < 1:
             sys.exit("--max-steps must be at least 1")
         cfg["train"]["max_steps"] = args.max_steps
+    if (args.arm == "mixed") != (args.mixed_lambda is not None):
+        sys.exit("--mixed-lambda is required for --arm mixed and only allowed with it")
+    if args.mixed_lambda is not None:
+        cfg["train"]["mixed_lambda"] = args.mixed_lambda
     run_id = args.run_id or f"{args.arm}_s{args.seed}"
 
     # Imported here so that --help works before T1's training loop exists.
@@ -131,6 +141,7 @@ def main() -> None:
         "config_hash": file_hash(config_path),
         # Not in the config file, so the config hash alone does not show it.
         "max_steps": cfg["train"].get("max_steps"),
+        "mixed_lambda": cfg["train"].get("mixed_lambda"),
     }
     update_run_log(run_id, status="running",
                    **{k: v for k, v in info.items() if k in RUN_LOG_COLUMNS and k != "run_id"})
