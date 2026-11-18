@@ -4,7 +4,7 @@ Usage (from the repo root):
     python scripts/20_train.py --config configs/default.yaml --arm onpolicy --seed 1
     python scripts/20_train.py --config configs/smoke.yaml --arm human --seed 1
     python scripts/20_train.py --config configs/default.yaml --arm human --seed 3 \
-        --run-id pilot_human_s3 --account T3
+        --run-id pilot_human_s3 --account T3 --max-steps 100
 
 This script does the bookkeeping around a run, so every run is recorded the
 same way:
@@ -24,6 +24,9 @@ Interface expected from T1 (src/kd/train.py):
                                                    and its tokenizer; this is the
                                                    path 30_evaluate.py loads).
         Returns a small summary dict, e.g. {"steps": 500, "oom_retries": 0}.
+
+        Stop after cfg["train"]["max_steps"] optimizer steps when it is not
+        None (the pilot); otherwise do the full pass over the pool.
         '''
 """
 
@@ -95,10 +98,16 @@ def main() -> None:
     parser.add_argument("--seed", required=True, type=int)
     parser.add_argument("--run-id", help="default: <arm>_s<seed>; use pilot_<arm>_s<seed> for the pilot")
     parser.add_argument("--account", default="", help="whose Kaggle account runs this, e.g. T3")
+    parser.add_argument("--max-steps", type=int, default=None,
+                        help="stop after this many steps (pilot only); overrides train.max_steps")
     args = parser.parse_args()
 
     config_path = Path(args.config)
     cfg = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    if args.max_steps is not None:
+        if args.max_steps < 1:
+            sys.exit("--max-steps must be at least 1")
+        cfg["train"]["max_steps"] = args.max_steps
     run_id = args.run_id or f"{args.arm}_s{args.seed}"
 
     # Imported here so that --help works before T1's training loop exists.
@@ -120,10 +129,14 @@ def main() -> None:
         "git_commit": git_commit(),
         "config_path": config_path.as_posix(),
         "config_hash": file_hash(config_path),
+        # Not in the config file, so the config hash alone does not show it.
+        "max_steps": cfg["train"].get("max_steps"),
     }
-    update_run_log(run_id, status="running", **{k: v for k, v in info.items() if k != "run_id"})
+    update_run_log(run_id, status="running",
+                   **{k: v for k, v in info.items() if k in RUN_LOG_COLUMNS and k != "run_id"})
     print(f"Run {run_id}: arm={args.arm} seed={args.seed} config={info['config_path']} "
-          f"({info['config_hash']}) commit={info['git_commit']}")
+          f"({info['config_hash']}) commit={info['git_commit']}"
+          + (f" max_steps={info['max_steps']}" if info["max_steps"] else ""))
 
     t0 = time.time()
     status, summary = "failed", {}
