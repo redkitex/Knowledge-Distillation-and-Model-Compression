@@ -21,3 +21,9 @@ headroom_results/
 # Quarto build output
 .quarto/
 report/*_files/
+
+# trained students: kept in the Kaggle session output, never in git
+results/runs/*/checkpoint/
+
+# smoke-test teacher answers (the real data/teacher_sequences.jsonl is committed)
+data/teacher_sequences_smoke.jsonl

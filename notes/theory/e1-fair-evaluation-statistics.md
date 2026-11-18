@@ -1,8 +1,10 @@
-# Fair evaluation: confidence intervals, paired comparisons, seeds and fidelity
+# Theory Note: e1-fair-evaluation-statistics
+
+**Fair evaluation: confidence intervals, paired comparisons, seeds and fidelity**
 
 Owner: E1 · Reviewer: T1 · Feeds: slides 8 (evaluation method) and 9 (results); note sections 4 (evaluation protocol) and 5 (results)
 
-This note covers topics 08 (evaluation statistics) and 09 (fidelity vs accuracy) of the old skeleton, since the Nov 15 guide gives one topic per person. The code is in `src/kd/stats.py`.
+This note covers the old topics 08 (evaluation statistics) and 09 (fidelity vs accuracy), merged into one note per person as in the Nov 15 guide. The code is in `src/kd/stats.py`.
 
 ## Definitions
 

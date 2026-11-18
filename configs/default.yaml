@@ -1,0 +1,50 @@
+# configs/default.yaml -- every setting for the real runs. Owner: T3.
+#
+# Status: PROPOSAL for the config lock on Fri Nov 20. Values marked
+# "pilot decides" may still change after the pilot; everything else follows
+# the plan. After the lock, change nothing here unless all six agree,
+# otherwise earlier runs become incomparable.
+#
+# Read by: scripts/10_cache_teacher_sequences.py (T2), scripts/20_train.py
+# (T3, calls src/kd/train.py from T1) and scripts/30_evaluate.py (E2).
+
+teacher: Qwen/Qwen3-4B            # frozen
+student: Qwen/Qwen3-0.6B          # full fine-tuning, no LoRA
+
+devices:
+  student: cuda:0                 # ~11 GB in training
+  teacher: cuda:1                 # ~8 GB in fp16
+
+data:
+  pool_size: 2000                 # fixed training questions (pilot decides: 1000 if on-policy is too slow)
+  pool_seed: 0                    # picks the pool once; the run seed only changes the order
+  teacher_sequences: data/teacher_sequences.jsonl   # made once by script 10, committed
+
+train:
+  questions_per_step: 4           # one pass over 2000 questions = 500 steps
+  epochs: 1
+  max_steps: null                 # null = the full pass; the pilot uses 20_train.py --max-steps 100
+  optimizer: adamw
+  lr: 1.0e-5                      # pilot decides (halve it if accuracy drops)
+  grad_clip: 1.0
+  loss: forward_kl                # forward_kl | reverse_kl (stretch) ; ref_hardlabel always uses hard-label cross-entropy
+  temperature: 1.0                # distillation temperature
+  student_dtype: float32          # weights in fp32 ...
+  autocast_dtype: float16         # ... compute in fp16 (a T4 has no fast bf16)
+  oom_retries: 2                  # retry a step with the same questions, then stop: never skip a step
+  log_every: 10                   # steps between console prints; train_log.jsonl gets every step
+
+generation:
+  max_new_tokens: 512             # one cap for on-policy answers, teacher answers and evaluation
+  sampling:                       # on-policy answers only (Qwen3 non-thinking defaults)
+    temperature: 0.7
+    top_p: 0.8
+    top_k: 20
+  teacher_decoding: greedy        # teacher answers: greedy, not filtered for correctness
+
+eval:
+  split: test                     # all 1,319 GSM8K test questions
+  n_questions: null               # null = all; the smoke config uses a small number
+  batch_size: 8                   # halves automatically on out-of-memory
+
+seeds: [1, 2, 3]
