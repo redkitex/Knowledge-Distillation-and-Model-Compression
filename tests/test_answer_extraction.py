@@ -1,5 +1,6 @@
 import pytest
 from kd.answer_extraction import extract_last_number, gold_answer
+from kd.data import load_split, find_ungradable_solutions
 
 def test_extract_last_number_basics():
     # Simple numbers and selection of the last one
@@ -32,3 +33,20 @@ def test_gold_answer():
     
     # Fallback if for some reason the dataset doesn't have '####'
     assert gold_answer("Just the number 42") == 42.0
+
+def test_all_human_solutions_gradable():
+    #Load the training split for validation
+    train_examples = load_split("train")
+    
+    # Creates the wrapper that data.py needs
+    def grader(human_response: str, gold: str) -> bool:
+        pred = extract_last_number(human_response)
+        if pred is None:
+            return False
+        return abs(pred - float(gold)) < 1e-6
+
+    # We searcg for any errors
+    ungradable = find_ungradable_solutions(train_examples, grader)
+    
+    # Needs to be empty
+    assert len(ungradable) == 0, f"{len(ungradable)} problems were found that were not graded correctly: {ungradable[:5]}"

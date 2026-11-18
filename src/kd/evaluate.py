@@ -5,7 +5,7 @@ from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from kd.data import prompt_ids
-from kd.answer_extraction import extract_last_number, gold_answer
+from kd.answer_extraction import extract_last_number
 
 @torch.no_grad()
 def generate_batch(model, tokenizer, device, prompts, eos_ids, max_new_tokens, dtype):
@@ -59,7 +59,7 @@ def generate_batch(model, tokenizer, device, prompts, eos_ids, max_new_tokens, d
         responses.append(row[:end])
     return responses
 
-def evaluate_model(model_name_or_path, device, problems, batch_size, max_new_tokens, dtype, tokenizer_name=None):
+def evaluate_model(model_name_or_path, device, problems, batch_size, max_new_tokens, dtype, tokenizer_name=None, run_id="", arm="", seed=0):
     """
     Evaluates a model on a set of GSM8K problems.
     """
@@ -86,7 +86,7 @@ def evaluate_model(model_name_or_path, device, problems, batch_size, max_new_tok
         batch = problems[batch_start: batch_start + batch_size]
         
         # Prompt_ids from kd.data are used
-        prompts = [prompt_ids(tokenizer, ex["question"]) for ex in batch]
+        prompts = [prompt_ids(tokenizer, ex.question) for ex in batch]
         
         responses = generate_batch(model, tokenizer, device, prompts, eos_ids, max_new_tokens, dtype)
 
@@ -95,18 +95,21 @@ def evaluate_model(model_name_or_path, device, problems, batch_size, max_new_tok
             
             # Functions from kd.answer_extraction are used
             predicted = extract_last_number(response_text)
-            expected = gold_answer(ex["answer"])
+            expected = float(ex.gold)
             
             is_correct = predicted is not None and abs(predicted - expected) < 1e-6
             truncated = (len(resp_ids) == 0) or (resp_ids[-1] not in eos_ids)
             
             records.append({
-                "question": ex["question"],
+                "run_id": run_id,
+                "arm": arm,
+                "seed": seed,
+                "question_id": ex.question_id,
                 "response": response_text,
-                "predicted": predicted,
-                "expected": expected,
+                "extracted_answer": predicted,
+                "gold_answer": expected,
                 "correct": is_correct,
-                "response_tokens": len(resp_ids),
+                "n_response_tokens": len(resp_ids),
                 "truncated": truncated,
             })
 
