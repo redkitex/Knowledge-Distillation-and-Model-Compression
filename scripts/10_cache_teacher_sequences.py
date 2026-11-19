@@ -42,9 +42,6 @@ import yaml
 
 from kd import data
 
-DEFAULT_OUT = "data/teacher_answers.jsonl"
-
-
 # --------------------------------------------------------------------------
 # Small pure helpers (no GPU needed; these are what the tests cover)
 # --------------------------------------------------------------------------
@@ -284,8 +281,7 @@ def load_teacher(name: str, device: str):
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--config", required=True)
-    parser.add_argument("--out", default=None,
-                        help=f"default: data.teacher_answers in the config, else {DEFAULT_OUT}")
+    parser.add_argument("--out", default=None)
     parser.add_argument("--batch-size", type=int, default=16,
                         help="speed only; halves itself if the GPU runs out of memory")
     parser.add_argument("--device", default="cuda:0")
@@ -293,7 +289,10 @@ def main() -> None:
     args = parser.parse_args()
 
     cfg = yaml.safe_load(Path(args.config).read_text())
-    out_path = Path(args.out or cfg["data"].get("teacher_answers", DEFAULT_OUT))
+        
+    out_path = Path(args.out or cfg["data"]["teacher_sequences"])
+    out_path.parent.mkdir(parents=True, exist_ok=True) # create /data if it doesn't exist
+    
     pool = data.load_pool(cfg["data"]["pool_size"], cfg["data"]["pool_seed"])
     fingerprint = settings_fingerprint(cfg, [ex.question_id for ex in pool])
 
