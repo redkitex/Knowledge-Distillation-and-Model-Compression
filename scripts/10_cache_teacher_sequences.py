@@ -4,8 +4,8 @@
 
 Output (both files are committed, so nobody has to regenerate them):
 
-    data/teacher_answers.jsonl      one row per pool question, in pool order
-    data/teacher_answers.meta.json  the settings used, a hash of the file, statistics
+    data/teacher_sequences.jsonl      one row per pool question, in pool order
+    data/teacher_sequences.meta.json  the settings used, a hash of the file, statistics
 
 One row of the JSONL file (this is the ``record`` that
 ``kd.data.build_teacher_sequence`` reads):

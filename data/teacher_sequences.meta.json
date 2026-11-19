@@ -1,0 +1,22 @@
+{
+  "settings": {
+    "teacher": "Qwen/Qwen3-4B",
+    "pool_size": 2000,
+    "pool_seed": 0,
+    "max_new_tokens": 512,
+    "decoding": "greedy",
+    "instruction": "Solve the problem step by step. Put the final number at the end.",
+    "question_ids_sha256": "a749ee11c28c449db2fe108a8792ba456773719d41adf8e259e684b3d9a06a28"
+  },
+  "complete": true,
+  "sha256": "6625db8e795a2d01e601a77f48a43b469c7bcc82b79e4712a95ff2c63e2892f7",
+  "stats": {
+    "n": 2000,
+    "mean_tokens": 259.8,
+    "max_tokens": 512,
+    "truncation_rate": 0.02,
+    "fraction_correct": 0.921
+  },
+  "batch_size": 16,
+  "seconds_this_session": 5306
+}
