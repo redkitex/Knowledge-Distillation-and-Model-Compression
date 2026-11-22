@@ -1,0 +1,9 @@
+{
+  "model": "results/runs/pilot_teacher_s1/checkpoint",
+  "n": 1319,
+  "correct": 718,
+  "accuracy": 0.5444,
+  "mean_response_tokens": 269.6,
+  "truncated_fraction": 0.0485,
+  "elapsed_seconds": 3278.8
+}

@@ -1,0 +1,26 @@
+{
+  "run_id": "pilot_teacher_s1",
+  "arm": "teacher",
+  "seed": 1,
+  "account": "T2",
+  "started_utc": "2026-11-21T18:56:03Z",
+  "git_commit": "38547424306469759a28d2aecb85bf0385b61f5d",
+  "config_path": "configs/default.yaml",
+  "config_hash": "782c64dfcbb6",
+  "max_steps": 100,
+  "mixed_lambda": null,
+  "status": "trained",
+  "ended_utc": "2026-11-21T19:01:23Z",
+  "gpu_hours": 0.089,
+  "summary": {
+    "steps": 100,
+    "final_loss_mean_last_10": 0.16444,
+    "tokens": 103701,
+    "oom_retries": 0,
+    "unfinished_sequences": 5,
+    "truncated_sequences": 0,
+    "train_seconds": 230.0,
+    "mixed_lambda": null,
+    "vocab_sliced_to": null
+  }
+}
