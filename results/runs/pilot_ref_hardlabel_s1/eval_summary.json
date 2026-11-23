@@ -1,0 +1,9 @@
+{
+  "model": "results/runs/pilot_ref_hardlabel_s1/checkpoint",
+  "n": 1319,
+  "correct": 391,
+  "accuracy": 0.2964,
+  "mean_response_tokens": 115.2,
+  "truncated_fraction": 0.0781,
+  "elapsed_seconds": 2250.5
+}

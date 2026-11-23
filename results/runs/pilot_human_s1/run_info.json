@@ -1,0 +1,26 @@
+{
+  "run_id": "pilot_human_s1",
+  "arm": "human",
+  "seed": 1,
+  "account": "T2",
+  "started_utc": "2026-11-22T21:50:09Z",
+  "git_commit": "ce3e8965a7c6e24f885e14e124dc12521c8ae1e3",
+  "config_path": "configs/default.yaml",
+  "config_hash": "782c64dfcbb6",
+  "max_steps": 100,
+  "mixed_lambda": null,
+  "status": "trained",
+  "ended_utc": "2026-11-22T21:54:38Z",
+  "gpu_hours": 0.075,
+  "summary": {
+    "steps": 100,
+    "final_loss_mean_last_10": 0.290033,
+    "tokens": 37348,
+    "oom_retries": 0,
+    "unfinished_sequences": 0,
+    "truncated_sequences": 0,
+    "train_seconds": 182.3,
+    "mixed_lambda": null,
+    "vocab_sliced_to": null
+  }
+}
