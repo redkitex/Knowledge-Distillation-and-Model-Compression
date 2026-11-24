@@ -25,7 +25,7 @@ train:
   epochs: 1
   max_steps: null                 # null = the full pass; the pilot uses 20_train.py --max-steps 100
   optimizer: adamw
-  lr: 1.0e-5                      # pilot decides (halve it if accuracy drops)
+  lr: 5.0e-6                      # pilot decides (halve it if accuracy drops)
   grad_clip: 1.0
   loss: forward_kl                # forward_kl | reverse_kl (stretch) ; ref_hardlabel always uses hard-label cross-entropy
   temperature: 1.0                # distillation temperature
