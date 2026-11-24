@@ -1,0 +1,26 @@
+{
+  "run_id": "pilot_onpolicy_lr5e-06_t0.5_s1",
+  "arm": "onpolicy",
+  "seed": 1,
+  "account": "T1",
+  "started_utc": "2026-11-24T02:30:08Z",
+  "git_commit": "38547424306469759a28d2aecb85bf0385b61f5d+dirty",
+  "config_path": "/kaggle/working/pilots/_configs/pilot_onpolicy_lr5e-06_t0.5_s1.yaml",
+  "config_hash": "0c6a6616c52d",
+  "max_steps": 100,
+  "mixed_lambda": null,
+  "status": "trained",
+  "ended_utc": "2026-11-24T03:05:19Z",
+  "gpu_hours": 0.586,
+  "summary": {
+    "steps": 100,
+    "final_loss_mean_last_10": 0.182721,
+    "tokens": 110170,
+    "oom_retries": 0,
+    "unfinished_sequences": 23,
+    "truncated_sequences": 0,
+    "train_seconds": 2089.6,
+    "mixed_lambda": null,
+    "vocab_sliced_to": null
+  }
+}

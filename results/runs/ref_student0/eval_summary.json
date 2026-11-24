@@ -1,0 +1,9 @@
+{
+  "model": "Qwen/Qwen3-0.6B",
+  "n": 1319,
+  "correct": 818,
+  "accuracy": 0.6202,
+  "mean_response_tokens": 232.5,
+  "truncated_fraction": 0.0174,
+  "elapsed_seconds": 2809.2
+}

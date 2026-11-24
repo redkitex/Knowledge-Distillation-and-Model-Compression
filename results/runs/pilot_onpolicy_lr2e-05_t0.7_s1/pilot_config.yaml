@@ -1,0 +1,37 @@
+teacher: Qwen/Qwen3-4B
+student: Qwen/Qwen3-0.6B
+devices:
+  student: cuda:0
+  teacher: cuda:1
+data:
+  pool_size: 2000
+  pool_seed: 0
+  teacher_sequences: data/teacher_sequences.jsonl
+train:
+  questions_per_step: 4
+  epochs: 1
+  max_steps: null
+  optimizer: adamw
+  lr: 2.0e-05
+  grad_clip: 1.0
+  loss: forward_kl
+  temperature: 1.0
+  student_dtype: float32
+  autocast_dtype: float16
+  oom_retries: 2
+  log_every: 10
+generation:
+  max_new_tokens: 512
+  sampling:
+    temperature: 0.7
+    top_p: 0.8
+    top_k: 20
+  teacher_decoding: greedy
+eval:
+  split: test
+  n_questions: null
+  batch_size: 8
+seeds:
+- 1
+- 2
+- 3

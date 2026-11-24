@@ -1,0 +1,9 @@
+{
+  "model": "results/runs/pilot_onpolicy_lr1e-05_t0.7_s1/checkpoint",
+  "n": 1319,
+  "correct": 799,
+  "accuracy": 0.6058,
+  "mean_response_tokens": 286.7,
+  "truncated_fraction": 0.0697,
+  "elapsed_seconds": 3429.7
+}
