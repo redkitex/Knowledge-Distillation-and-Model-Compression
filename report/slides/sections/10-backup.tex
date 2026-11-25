@@ -1,0 +1,157 @@
+% =====================================================================
+% 10-backup.tex -- Backup slides (not counted in the 60 minutes) and
+% references. Owner: T3; references: E2.
+% =====================================================================
+\renewcommand{\sectioninfo}{Backup slides and references}
+\section{Backup}
+
+% ------------------------------------------------------------------
+\begin{frame}{Backup: all pilot runs (seed 1, 100 steps)\hfill\ours}
+  \centering\footnotesize
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{@{}l l r r r@{}}
+    \toprule
+    \textbf{Run} & \textbf{Arm} & \textbf{lr} & \textbf{sampling $T$} & \textbf{Accuracy (\%)} \\
+    \midrule
+    \arm{pilot\_human\_s1}         & human         & $1\cdot10^{-5}$ & --  & 51.0 \\
+    \arm{pilot\_teacher\_s1}       & teacher       & $1\cdot10^{-5}$ & --  & 54.4 \\
+    \arm{pilot\_ref\_hardlabel\_s1} & ref\_hardlabel & $1\cdot10^{-5}$ & --  & 29.6 \\
+    \midrule
+    \arm{pilot\_onpolicy\_lr1e-05\_t0.7\_s1} & onpolicy & $1\cdot10^{-5}$ & 0.7 & 60.6 \\
+    \arm{pilot\_onpolicy\_lr2e-05\_t0.7\_s1} & onpolicy & $2\cdot10^{-5}$ & 0.7 & 50.2 \\
+    \arm{pilot\_onpolicy\_lr5e-06\_t0.5\_s1} & onpolicy & $5\cdot10^{-6}$ & 0.5 & 64.5 \\
+    \arm{pilot\_onpolicy\_lr5e-06\_t0.7\_s1} & onpolicy & $5\cdot10^{-6}$ & 0.7 & \textbf{65.6} \\
+    \arm{pilot\_onpolicy\_lr5e-06\_t1\_s1}   & onpolicy & $5\cdot10^{-6}$ & 1.0 & 63.5 \\
+    \midrule
+    \arm{ref\_student0} & untrained & -- & -- & 62.0 \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{0.2cm}
+  \raggedright\scriptsize
+  At $1\cdot10^{-5}$ every off-policy pilot fell below the untrained student, which led to the
+  sweep and to $5\cdot10^{-6}$ for all main runs. Pilots and main runs used different learning
+  rates, so their numbers are not compared with each other. All 8 pilots saw identical
+  questions in identical order.
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Backup: running one arm on Kaggle\hfill\who{T3}}
+  \begin{columns}[T]
+    \begin{column}{0.58\textwidth}
+\begin{lstlisting}[basicstyle=\ttfamily\tiny]
+# notebooks/kaggle_run.ipynb, settings cell
+REPO = "https://github.com/redkitex/Knowledge-Distillation-and-Model-Compression.git"
+REF = "f2accc6"                # same commit for every seed
+CONFIG = "configs/default.yaml"
+MODE = "train+eval"            # or "eval" for references
+ARM = "onpolicy"               # human | teacher | onpolicy | ref_hardlabel
+SEED = 3
+RUN_ID = None                  # -> "onpolicy_s3"
+ACCOUNT = "T3"                 # whose Kaggle account
+MAX_STEPS = None               # None = the full 500 steps
+\end{lstlisting}
+    \end{column}
+    \begin{column}{0.39\textwidth}
+      \footnotesize
+      \begin{enumerate}
+        \item Session options: GPU T4 x2, internet on.
+        \item Edit the settings cell only.
+        \item Save Version, Save \& Run All: clone, install, train, evaluate.
+        \item Download \texttt{<run\_id>.zip} from the output; copy the row
+              from \texttt{run\_info.json} into \repofile{results/run\_log.csv}.
+      \end{enumerate}
+      \vspace{0.1cm}
+      {\scriptsize\color{kdgray} One free account runs one GPU session at a time:
+      start the 3-hour on-policy run first.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Backup: how the project ran\hfill\who{T3}}
+  \centering
+  \begin{tikzpicture}[font=\tiny,
+      ev/.style={text width=1.35cm,align=center,inner sep=1pt},
+      done/.style={circle,fill=kdblue,inner sep=1.4pt},
+      plan/.style={circle,draw=kdgray,fill=white,inner sep=1.4pt}]
+    \def\ux{0.72}
+    \draw[kdgray,thick] (-0.3,0) -- (12.6,0);
+    % day ticks every two days, labelled
+    \foreach \dd/\lab in {0/15,2/17,4/19,6/21,8/23,10/25,12/27,14/29}
+      {\draw[kdgray] (\dd*\ux,-0.08) -- (\dd*\ux,0.08);
+       \node[text=kdgray,below=0.1cm] at (\dd*\ux,0) {Nov \lab};}
+    \draw[kdgray] (16*\ux,-0.08) -- (16*\ux,0.08);
+    \node[text=kdgray,below=0.1cm] at (16*\ux,0) {Dec 1};
+    % pilots range
+    \fill[kdblue!25] (6*\ux,-0.05) rectangle (9*\ux,0.05);
+    % events above
+    \node[done] at (0,0) {};             \node[ev,above=0.25cm] at (0,0) {plan restarted};
+    \node[done] at (3*\ux,0) {};         \node[ev,above=0.25cm] at (3*\ux,0) {training, evaluation, stats code merged; Project Meeting 3};
+    \node[ev,above=0.25cm] at (7.5*\ux,0) {pilots and learning-rate sweep (Nov 21 to 24)};
+    \node[plan] at (14*\ux,0) {};        \node[ev,above=0.25cm,text=kdgray] at (14*\ux,0) {drafts done};
+    \node[plan] at (16*\ux,0) {};        \node[ev,above=0.25cm,text=kdgray] at (16*\ux,0) {submit artifacts};
+    % events below
+    \node[done] at (1*\ux,0) {};         \node[ev,below=0.55cm] at (1*\ux,0) {skeleton and \texttt{data.py} merged};
+    \node[done] at (4*\ux,0) {};         \node[ev,below=0.55cm] at (4*\ux,0) {2,000 teacher answers cached};
+    \node[done] at (9.5*\ux,0) {};       \node[ev,below=0.55cm] at (9.5*\ux,0) {lr locked; seeds 2 and 3 trained and logged};
+    \node[plan] at (15*\ux,0) {};        \node[ev,below=0.55cm,text=kdgray] at (15*\ux,0) {dress rehearsal};
+    \node[plan,draw=kdorange] at (17*\ux,0) {}; \node[ev,below=0.55cm,text=kdorange] at (17*\ux,0) {\textbf{talk}, Dec 2};
+    % today marker
+    \draw[kdorange,dashed] (10*\ux,-0.45) -- (10*\ux,0.45);
+  \end{tikzpicture}
+
+  \vspace{0.35cm}
+  \scriptsize
+  \begin{tabular}{@{}llll@{}}
+    \toprule
+    & \textbf{1} & \textbf{2} & \textbf{3} \\
+    \midrule
+    \textbf{Training team} (builds, runs) & T1 training loop & T2 data, teacher answers & T3 runs, configs, slides \\
+    \textbf{Evaluation team} (measures, explains) & E1 statistics, note & E2 evaluation, literature & E3 figures, repository \\
+    \bottomrule
+  \end{tabular}
+  \vspace{0.1cm}
+
+  {\scriptsize\color{kdgray} Filled dots: done (from the commit history); open dots: planned; dashed line: Nov 25.}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{References\hfill\who{E2}}
+  \begin{columns}[T]
+    \begin{column}{0.49\textwidth}
+      \tiny
+      \begin{itemize}\setlength{\itemsep}{1pt}
+        \item Agarwal et al. (2024). On-Policy Distillation of Language Models: Learning from Self-Generated Mistakes. ICLR.
+        \item Bengio, Vinyals, Jaitly, Shazeer (2015). Scheduled Sampling for Sequence Prediction with Recurrent Neural Networks. NeurIPS.
+        \item Brown, Cai, DasGupta (2001). Interval Estimation for a Binomial Proportion. Statistical Science.
+        \item Cobbe et al. (2021). Training Verifiers to Solve Math Word Problems. arXiv.
+        \item DeepSeek-AI (2025). DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning. arXiv.
+        \item Efron, Tibshirani (1993). An Introduction to the Bootstrap. Chapman \& Hall.
+        \item Furlanello et al. (2018). Born Again Neural Networks. ICML.
+        \item Gu, Dong, Wei, Huang (2024). MiniLLM: Knowledge Distillation of Large Language Models. ICLR.
+        \item Hinton, Vinyals, Dean (2015). Distilling the Knowledge in a Neural Network. arXiv.
+        \item Kim, Rush (2016). Sequence-Level Knowledge Distillation. EMNLP.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \tiny
+      \begin{itemize}\setlength{\itemsep}{1pt}
+        \item Li et al. (2026). Rethinking On-Policy Distillation of Large Language Models: Phenomenology, Mechanism, and Recipe. arXiv.
+        \item Lu, Thinking Machines Lab (2025). On-Policy Distillation. Blog post.
+        \item Miller (2024). Adding Error Bars to Evals: A Statistical Approach to Language Model Evaluations. arXiv.
+        \item Qwen Team (2025). Qwen3 Technical Report. arXiv.
+        \item Ross, Gordon, Bagnell (2011). A Reduction of Imitation Learning and Structured Prediction to No-Regret Online Learning. AISTATS.
+        \item Song, Zheng (2026). A Survey of On-Policy Distillation for Large Language Models. arXiv.
+        \item Stanton et al. (2021). Does Knowledge Distillation Really Work? NeurIPS.
+        \item Wilson (1927). Probable Inference, the Law of Succession, and Statistical Inference. JASA.
+        \item Wu et al. (2025). Reasoning or Memorization? Unreliable Results of Reinforcement Learning Due to Data Contamination. arXiv.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \vspace{0.1cm}
+  \begin{todobox}{Verify every reference (E2)}
+    The course requires checking authors, year and venue against each paper. Ross 2011, Li 2026 and
+    Song and Zheng 2026 are not yet in \repofile{report/references.bib}.
+  \end{todobox}
+\end{frame}

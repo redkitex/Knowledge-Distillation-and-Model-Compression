@@ -1,0 +1,131 @@
+% =====================================================================
+% 09-conclusion.tex -- Conclusion and reproducibility.  E3, 3 min
+% Sources: repository layout on main, scripts/20_train.py,
+%          notebooks/kaggle_run.ipynb, results/run_log.csv
+% =====================================================================
+\renewcommand{\sectioninfo}{Presenter: E3 \quad $\cdot$ \quad 3 minutes}
+\section{Conclusion and reproducibility}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Reproduce everything from the repository\hfill\who{E3}}
+  \begin{columns}[T]
+    \begin{column}{0.47\textwidth}
+\begin{lstlisting}[style=kdplain]
+configs/    default.yaml, smoke.yaml
+data/       teacher_sequences.jsonl
+src/kd/     data, answer_extraction, losses,
+            train, evaluate, stats
+scripts/    10_cache_teacher_sequences.py
+            20_train.py   30_evaluate.py
+            40_make_figures.py
+notebooks/  kaggle_run.ipynb, archive/
+tests/      one pytest file per module
+results/    run_log.csv, runs/<run_id>/
+report/     note.qmd, references.bib, slides/
+\end{lstlisting}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+\begin{lstlisting}[style=kdplain,language=bash,basicstyle=\ttfamily\tiny]
+pip install -r requirements.txt && pip install -e .
+CFG=configs/default.yaml
+python scripts/10_cache_teacher_sequences.py --config $CFG
+python scripts/20_train.py --config $CFG --arm onpolicy --seed 1
+python scripts/30_evaluate.py --config $CFG --run onpolicy_s1
+python -m kd.stats --out results/tables/results_table.csv
+\end{lstlisting}
+      \footnotesize
+      \begin{itemize}
+        \item \repofile{configs/smoke.yaml}: the same pipeline on 16 questions,
+              about 15 minutes.
+        \item Teacher answers and every run's predictions are committed, so the
+              statistics rerun without a GPU.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \begin{todobox}{README and figure script (E3)}
+    \repofile{README.md} is still the 2-line stub and
+    \repofile{scripts/40\_make\_figures.py} is empty on \repofile{main}; both are
+    required by the brief.
+  \end{todobox}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Every number traces back to code and settings\hfill\ours\ \who{E3}}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+\begin{lstlisting}
+# scripts/20_train.py records every run (shortened)
+info = {
+    "run_id": run_id, "arm": args.arm,
+    "seed": args.seed, "started_utc": utc_now(),
+    "git_commit": git_commit(),     # "+dirty" if edited
+    "config_hash": file_hash(cfg),  # sha256 of the file
+}
+update_run_log(run_id, status="running", **info)
+summary = run_training(cfg, arm, seed, out_dir)
+# finally: status, end time, GPU-hours -> run_info.json
+\end{lstlisting}
+    \end{column}
+    \begin{column}{0.45\textwidth}
+      \footnotesize
+      \begin{itemize}
+        \item One row per run in \repofile{results/run\_log.csv}, one folder per run
+              in \repofile{results/runs/}.
+        \item All 8 main runs so far: commit \texttt{f2accc6}, config hash
+              \texttt{85bee6cac023}: identical code and settings.
+        \item On Kaggle, \repofile{notebooks/kaggle\_run.ipynb} only clones that
+              commit and calls the scripts: no logic hidden in a notebook.
+        \item Checkpoints stay on Kaggle; only small result files enter git.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Conclusion\hfill\who{E3}}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+      \begin{keybox}
+        \small At equal updates and with the same target, \textbf{the student's own text}
+        was the only source that made Qwen3-0.6B better at GSM8K: about
+        \textbf{+7 points} over the untrained model in both seeds so far, while human
+        and teacher text gave no gain. Matching the teacher's \textbf{probabilities}
+        rather than hard labels was worth about \textbf{+16 points}.
+      \end{keybox}
+      \vspace{0.1cm}
+      {\scriptsize\color{kdgray} Draft based on seeds 2 and 3; confirm with seed 1.}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \begin{block}{Next steps we did not run}
+        \footnotesize
+        \begin{itemize}
+          \item A compute-matched comparison
+          \item Reverse KL and mixed on/off-policy batches
+          \item Other distillation temperatures
+          \item A same-size teacher (Born-Again setting)
+          \item A second dataset or model family
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \begin{todobox}{Final take-home message (E3 with the team)}
+    Agree on one sentence the audience should remember, after seed 1 and the interpretation meeting.
+  \end{todobox}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[plain,noframenumbering]
+  \begin{tikzpicture}[remember picture,overlay]
+    \fill[kdpaler] (current page.north west) rectangle (current page.south east);
+    \fill[kdblue] (current page.north west) rectangle ([xshift=0.22cm]current page.south west);
+  \end{tikzpicture}%
+  \centering
+  \vspace{1.2cm}
+  {\color{kdnavy}\Huge\bfseries Questions?\par}
+  \vspace{0.5cm}
+  {\color{kdblue}\large Whose text should a small model practise on?\par}
+  \vspace{0.8cm}
+  {\small\color{kdgray} Code, results and this deck:
+  \texttt{github.com/redkitex/Knowledge-Distillation-and-Model-Compression}\par}
+\end{frame}

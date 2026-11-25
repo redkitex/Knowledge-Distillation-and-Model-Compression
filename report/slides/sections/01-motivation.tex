@@ -1,0 +1,137 @@
+% =====================================================================
+% 01-motivation.tex -- Motivation and research question.  T3, 6 min
+% Sources: notes/emre-notes-on-sources.txt, Sources/README.md,
+%          report/references.bib (keys: deepseek2025r1, qwen2025qwen3,
+%          lu2025onpolicy, hinton2015distilling)
+% =====================================================================
+\renewcommand{\sectioninfo}{Presenter: T3 \quad $\cdot$ \quad 6 minutes}
+\section{Motivation and research question}
+
+% ------------------------------------------------------------------
+\begin{frame}{Small models learn to reason from big ones\hfill\est\ \who{T3}}
+  \begin{columns}[T]
+    \begin{column}{0.44\textwidth}
+      \begin{itemize}
+        \item<1-> Big language models reason well, but are slow and
+              expensive to run.
+        \item<2-> \textbf{Distillation}: train a small \emph{student} to
+              imitate a large \emph{teacher} \src{Hinton et al., 2015}.
+        \item<3-> In 2025 it became the standard way to build small
+              reasoning models, but recipes disagree on \emph{what text}
+              the student should learn from.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.53\textwidth}
+      \footnotesize
+      \begin{uncoverenv}<4->
+      \begin{tcolorbox}[enhanced,colback=white,colframe=kdblue,boxrule=0.5pt,arc=2pt,
+          left=4pt,right=4pt,top=2pt,bottom=2pt,title={DeepSeek-R1 (2025)},
+          fonttitle=\bfseries\scriptsize,colbacktitle=kdblue]
+        Small students fine-tuned on about 800k \textbf{teacher-written}
+        answers. Text only, no teacher probabilities: off-policy.
+      \end{tcolorbox}
+      \end{uncoverenv}
+      \vspace{-0.1cm}
+      \begin{uncoverenv}<5->
+      \begin{tcolorbox}[enhanced,colback=white,colframe=kdteal,boxrule=0.5pt,arc=2pt,
+          left=4pt,right=4pt,top=2pt,bottom=2pt,title={Qwen3 (2025)},
+          fonttitle=\bfseries\scriptsize,colbacktitle=kdteal]
+        Stage 1 off-policy on teacher answers; stage 2 \textbf{on-policy}:
+        the student writes, the teacher scores every token. Reported on
+        AIME'24: 74.4 vs 67.6 for RL at about 1/10 of the GPU hours.
+      \end{tcolorbox}
+      \end{uncoverenv}
+      \vspace{-0.1cm}
+      \begin{uncoverenv}<6->
+      \begin{tcolorbox}[enhanced,colback=white,colframe=kdgray,boxrule=0.5pt,arc=2pt,
+          left=4pt,right=4pt,top=2pt,bottom=2pt,title={Thinking Machines Lab (2025)},
+          fonttitle=\bfseries\scriptsize,colbacktitle=kdgray]
+        ``A chess engine grading every move of \emph{your own} game,
+        not only telling you whether you won.''
+      \end{tcolorbox}
+      \end{uncoverenv}
+    \end{column}
+  \end{columns}
+  \vspace{0.05cm}
+  {\tiny\color{kdgray} Numbers as reported by the cited authors; we did not reproduce them.}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Two things change at once in these recipes\hfill\est\ \who{T3}}
+  \begin{columns}[c]
+    \begin{column}{0.55\textwidth}
+      \centering
+      \begin{tikzpicture}[font=\scriptsize,
+          cell/.style={draw=kdgray,minimum width=2.5cm,minimum height=1.15cm,align=center}]
+        \node[cell,fill=kdlight] (a) at (0,0) {DeepSeek-R1\\(teacher text, text only)};
+        \node[cell,fill=white] (b) at (2.5,0) {};
+        \node[cell,fill=white] (c) at (0,-1.15) {};
+        \node[cell,fill=kdteal!12] (d) at (2.5,-1.15) {Qwen3 stage 2\\(own text, probabilities)};
+        \node[font=\scriptsize\bfseries,text=kdnavy] at (1.25,1.1) {What the student is trained to match};
+        \node[font=\tiny,text=kdgray] at (0,0.75) {only the text};
+        \node[font=\tiny,text=kdgray] at (2.5,0.75) {teacher probabilities};
+        \node[font=\tiny,text=kdgray,rotate=90] at (-1.55,0) {teacher text};
+        \node[font=\tiny,text=kdgray,rotate=90] at (-1.55,-1.15) {own text};
+        \node[font=\scriptsize\bfseries,text=kdnavy,rotate=90] at (-1.95,-0.57) {Training text};
+        % our experiment: fix the target, vary the text
+        \draw[kdorange,very thick,rounded corners=3pt,visible on=<2->]
+          ($(b.north west)+(0.06,-0.06)$) rectangle ($(d.south east)+(-0.06,0.06)$);
+        \node[text=kdorange,font=\scriptsize\bfseries,align=left,anchor=west,visible on=<2->]
+          at (3.85,-0.57) {Our experiment:\\fix the target,\\vary the text};
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \small
+      \begin{itemize}
+        \item<1-> R1 changes \emph{both}: teacher text \emph{and} a
+              text-only target.
+        \item<1-> Qwen3 stage 2 uses the student's own text \emph{and}
+              the full distribution.
+        \item<2-> So which part helps? We keep the target fixed
+              (the teacher's full next-token distribution) and change
+              \textbf{only} where the training text comes from.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Our research question\hfill\who{T3}}
+  \begin{keybox}
+    At an equal number of student updates, does the \textbf{source of the
+    training text} (human-written, teacher-written, or the student's own)
+    change how well \textbf{Qwen3-0.6B} learns from \textbf{Qwen3-4B}, when the
+    target is always the teacher's full next-token distribution?
+  \end{keybox}
+  \vspace{0.2cm}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \small
+      \textbf{Why it could matter}
+      \begin{itemize}
+        \item<2-> Text written by others never contains the student's own
+              mistakes, so it never learns what to do after one
+              (\emph{exposure bias}, part 3).
+        \item<3-> On-policy text fixes that, but costs about 10$\times$ more
+              compute per step in our setup.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \small
+      \textbf{Plus the classic B3 question}
+      \begin{itemize}
+        \item<4-> Same human text, two targets: the teacher's
+              probabilities vs hard labels (the correct token only).
+        \item<5-> Tells us what the soft targets themselves are worth
+              \src{Hinton et al., 2015}.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \begin{uncoverenv}<6->
+  \begin{todobox}{T3's opening hook}
+    Optional: a one-line real-world example of why small models matter
+    (phone, cost per answer). Delete this box if not needed.
+  \end{todobox}
+  \end{uncoverenv}
+\end{frame}

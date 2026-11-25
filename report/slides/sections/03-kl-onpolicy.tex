@@ -1,0 +1,128 @@
+% =====================================================================
+% 03-kl-onpolicy.tex -- KL directions, on-policy training, exposure bias.
+% T1, 6 min. Sources: src/kd/losses.py docstrings, Gu et al. 2024 (MiniLLM),
+% Agarwal et al. 2024 (GKD), Bengio et al. 2015, Song & Zheng 2026 summary
+% in notes/emre-notes-on-sources.txt.
+% Theory note: notes/theory/t1-kl-directions-exposure-bias.md
+% =====================================================================
+\renewcommand{\sectioninfo}{Presenter: T1 \quad $\cdot$ \quad 6 minutes}
+\section{KL directions and on-policy training}
+
+% ------------------------------------------------------------------
+\begin{frame}{Which way round? Forward vs reverse KL\hfill\est\ \who{T1}}
+  \begin{columns}[c]
+    \begin{column}{0.47\textwidth}
+      \small
+      \textbf{Forward KL} $\;\mathrm{KL}(p_T \,\|\, p_S)$: mass-covering.
+      The student must put probability wherever the teacher does.
+      \vspace{0.15cm}
+
+      \uncover<3->{\textbf{Reverse KL} $\;\mathrm{KL}(p_S \,\|\, p_T)$:
+      mode-seeking. The student is punished for mass where the teacher
+      has little, so it commits to one mode \src{Gu et al., 2024}.}
+      \vspace{0.15cm}
+
+      \begin{uncoverenv}<4->
+      \begin{keybox}
+        \footnotesize We use \textbf{forward KL} for all four main arms, the
+        classic distillation target. Reverse KL on \arm{onpolicy} was a
+        stretch run and was not done.
+      \end{keybox}
+      \end{uncoverenv}
+    \end{column}
+    \begin{column}{0.50\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[kdaxis,width=6.8cm,height=4.9cm,
+            domain=-5:5,samples=121,ymin=0,ymax=0.72,
+            axis lines=left,xtick=\empty,ytick=\empty,
+            xlabel={possible continuations},ylabel={probability},
+            legend pos=north west,legend cell align=left]
+          \addplot[kdnavy,very thick] {0.5*exp(((x+2)*(x+2))/(-0.72))/(0.6*sqrt(2*pi))
+                                     + 0.5*exp(((x-2)*(x-2))/(-0.72))/(0.6*sqrt(2*pi))};
+          \addplot[kdblue,thick,dashed,visible on=<2->] {exp((x*x)/(-8.72))/(2.09*sqrt(2*pi))};
+          \addplot[kdorange,thick,densely dotted,visible on=<3->] {exp(((x-2)*(x-2))/(-0.845))/(0.65*sqrt(2*pi))};
+          \legend{teacher, forward-KL student, reverse-KL student}
+        \end{axis}
+      \end{tikzpicture}
+
+      {\tiny\color{kdgray} Illustration: a two-mode teacher and the best single-mode student under each divergence.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Exposure bias: practising on someone else's text\hfill\est\ \who{T1}}
+  \centering
+  \begin{tikzpicture}[font=\tiny,
+      tok/.style={draw=kdgray,rounded corners=2pt,minimum width=0.95cm,minimum height=0.5cm,fill=white,inner sep=1.5pt},
+      good/.style={tok,fill=kdpale,draw=kdblue},
+      bad/.style={tok,fill=kdred!12,draw=kdred},
+      own/.style={tok,fill=kdteal!12,draw=kdteal}]
+    % row 1: off-policy training
+    \node[anchor=east,align=right,text=kdnavy,font=\scriptsize\bfseries] at (-0.1,0) {Off-policy training\\(human or teacher text)};
+    \foreach \i/\w in {0/Natalia,1/sold,2/$48\div2$,3/=,4/24,5/clips,6/in,7/May}
+      \node[good] at (\i*1.05+0.55,0) {\w};
+    % row 2: test time, the student's own prefix
+    \node[anchor=east,align=right,text=kdnavy,font=\scriptsize\bfseries,visible on=<2->] at (-0.1,-0.95) {At test time\\(its own text)};
+    \foreach \i/\w in {0/Natalia,1/sold,2/$48\div2$,3/=}
+      \node[good,visible on=<2->] at (\i*1.05+0.55,-0.95) {\w};
+    \node[bad,visible on=<2->] at (4*1.05+0.55,-0.95) {42};
+    \foreach \i/\w in {5/clips,6/so,7/84}
+      \node[bad,visible on=<3->] at (\i*1.05+0.55,-0.95) {\w};
+    \node[text=kdred,font=\tiny,align=left,visible on=<3->,anchor=west] at (8.5,-0.95) {an unseen state:\\errors compound};
+    % row 3: on-policy training
+    \node[anchor=east,align=right,text=kdnavy,font=\scriptsize\bfseries,visible on=<4->] at (-0.1,-2.05) {On-policy training\\(teacher scores own text)};
+    \foreach \i/\w in {0/Natalia,1/sold,2/$48\div2$,3/=,4/42,5/clips}
+      \node[own,visible on=<4->] (o\i) at (\i*1.05+0.55,-2.05) {\w};
+    \foreach \i in {0,...,5}
+      \draw[-{Stealth[length=1.4mm]},kdorange,visible on=<4->] ($(o\i.south)+(0,-0.32)$) -- (o\i.south);
+    \node[text=kdorange,font=\tiny,anchor=north,visible on=<4->] at (3.2,-2.65) {the teacher's full distribution at every position of the student's own answer};
+  \end{tikzpicture}
+  \vspace{0.1cm}
+  \begin{itemize}\small
+    \item<2-> Off-policy training only ever shows \emph{correct} prefixes; the student
+          never learns to recover from its own mistakes \src{Bengio et al., 2015}.
+    \item<4-> On-policy distillation trains on the student's own prefixes, with dense
+          token-level feedback from the teacher \src{Agarwal et al., 2024}.
+  \end{itemize}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Why on-policy should help, and what it costs\hfill\est\ \who{T1}}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{The argument}
+        \footnotesize
+        \begin{itemize}
+          \item Imitation learning: off-policy error can grow with the
+                \emph{square} of the sequence length, on-policy only
+                linearly (DAgger, Ross et al., 2011).
+          \item GKD unifies the methods: choose \emph{whose} text is
+                sampled and \emph{which} divergence is used
+                \src{Agarwal et al., 2024}.
+          \item Survey advice: off-policy is enough for style and
+                knowledge; on-policy pays off for reasoning
+                \src{Song and Zheng, 2026}.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{The cost, in our own runs \ours}
+        \footnotesize
+        Training time per run, seed 2 / seed 3, on Kaggle T4 x2:
+        \begin{itemize}
+          \item \arm{onpolicy}: 3.34 / 3.01 GPU-hours
+          \item the other arms: 0.21 to 0.36 GPU-hours
+        \end{itemize}
+        About 10$\times$ more, because the student writes 4 new answers
+        at every step (about 85 to 90\% of the step time).
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \begin{todobox}{T1's own explanation (theory note is still empty)}
+    Fill \repofile{notes/theory/t1-kl-directions-exposure-bias.md}; check the
+    DAgger and survey claims against the papers before presenting.
+  \end{todobox}
+\end{frame}

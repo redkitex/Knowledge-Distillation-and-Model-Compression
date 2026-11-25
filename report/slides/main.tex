@@ -1,0 +1,47 @@
+% =====================================================================
+% Project B3 -- central slide deck for the 60-minute talk (Wed 2 Dec 2026)
+% Overleaf: compiler pdfLaTeX, main document main.tex.
+%
+% Who edits what (one file per section, so nobody overwrites anybody):
+%   sections/00-opening.tex          T3  title, draft status, roadmap
+%   sections/01-motivation.tex       T3  6 min
+%   sections/02-kd-basics.tex        T2  8 min
+%   sections/03-kl-onpolicy.tex      T1  6 min
+%   sections/04-literature.tex       E2  8 min
+%   sections/05-design.tex           T3 4, T2 2, T1 4 min (incl. pipeline)
+%   sections/06-evaluation.tex       E2 2, E1 2 min
+%   sections/07-results.tex          E1 6, E3 4 min
+%   sections/08-interpretation.tex   E1 2, E3 3 min
+%   sections/09-conclusion.tex       E3 3 min (+ T3 traceability slide)
+%   sections/10-backup.tex           backup slides and references
+%
+% Shared colours and macros: preamble.tex (owner T3).
+% Orange "To add" boxes mark content that is missing from the repository
+% or still has to be written. Replace each box when the content exists.
+% =====================================================================
+\documentclass[aspectratio=169,10pt]{beamer}
+\input{preamble}
+
+\title{Whose Text Should a Small Model Practise On?}
+\subtitle{Distilling Qwen3-4B into Qwen3-0.6B on GSM8K}
+\author{Team B3: T1, T2, T3, E1, E2, E3 \quad{\color{kdorange}(add names)}}
+\institute{AAI2 Practical Project B3: Knowledge Distillation and Model Compression}
+\date{Wednesday 2 December 2026}
+
+\begin{document}
+
+\input{sections/00-opening}
+\input{sections/01-motivation}
+\input{sections/02-kd-basics}
+\input{sections/03-kl-onpolicy}
+\input{sections/04-literature}
+\input{sections/05-design}
+\input{sections/06-evaluation}
+\input{sections/07-results}
+\input{sections/08-interpretation}
+\input{sections/09-conclusion}
+
+\appendix
+\input{sections/10-backup}
+
+\end{document}

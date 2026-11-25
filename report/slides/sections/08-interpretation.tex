@@ -1,0 +1,78 @@
+% =====================================================================
+% 08-interpretation.tex -- Interpretation and limitations.
+% E1 2 min (what the results show), E3 3 min (limitations and
+% alternative explanations). DRAFT: based on seeds 2 and 3 only; update
+% after seed 1 and the interpretation meeting.
+% =====================================================================
+\renewcommand{\sectioninfo}{Presenters: E1 (2 min), E3 (3 min)}
+\section{Interpretation and limitations}
+
+% ------------------------------------------------------------- E1
+\begin{frame}{What the results show (draft, two seeds)\hfill\ours\ \who{E1}}
+  \small
+  \begin{enumerate}
+    \item<1-> \textbf{The source of the text matters.} With the same target and the same
+          500 updates, the student's own text gave \textbf{+6.3 and +7.1 points} over the
+          untrained student and +6.7 to +11.5 over the other two sources; every one of these
+          intervals excludes 0.
+    \item<2-> \textbf{Off-policy text did not help here.} Teacher text: $-1.8$ and $+0.5$
+          (not significant); human text: $-5.2$ (significant) and $-1.9$ (not).
+          The already tuned student had little to gain from imitating fixed text.
+    \item<3-> \textbf{Soft targets matter.} On the same human text, matching the teacher's
+          distribution beat hard labels by \textbf{+15.6 and +17.3 points}: the classic
+          B3 result, reproduced at this scale.
+  \end{enumerate}
+  \vspace{0.15cm}
+  \begin{uncoverenv}<4->
+  \begin{keybox}
+    \footnotesize This pattern \emph{fits} the exposure-bias explanation: only the arm that
+    learns on its own prefixes improves. It does not \emph{prove} it; the next slide
+    lists what else could produce the same numbers.
+  \end{keybox}
+  \end{uncoverenv}
+  \begin{uncoverenv}<4->
+  \begin{todobox}{Final wording after seed 1 and the interpretation meeting (E1)}
+    Check that seed 1 shows the same pattern; then fix the wording here and in the note.
+  \end{todobox}
+  \end{uncoverenv}
+\end{frame}
+
+% ------------------------------------------------------------- E3
+\begin{frame}{Limitations and alternative explanations\hfill\who{E3}}
+  \begin{columns}[T]
+    \begin{column}{0.49\textwidth}
+      \begin{block}{Could something else explain the gain?}
+        \footnotesize
+        \begin{itemize}
+          \item \textbf{Compute}: on-policy used about 10$\times$ the training
+                time. A compute-matched comparison would be fairer to the
+                other arms.
+          \item \textbf{Tuning}: the learning rate was picked on the on-policy
+                arm and on the test set, which may favour it slightly.
+          \item \textbf{Tokens}: equal updates gave the arms different
+                numbers of answer tokens (190k to 566k).
+          \item \textbf{Length}: on-policy answers are longer, but it still
+                leads within each of the two main length bands.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \begin{block}{What our design cannot tell us}
+        \footnotesize
+        \begin{itemize}
+          \item One dataset (GSM8K), one model pair from one family.
+          \item Three seeds at most (two so far); 500 updates only.
+          \item Distillation temperature fixed at 1; forward KL only.
+          \item Qwen models may have seen GSM8K in pre-training
+                \src{Wu et al., 2025}; it affects all arms alike.
+          \item Teacher answers were greedy and not filtered for
+                correctness (92.1\% correct).
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vspace{0.1cm}
+  \begin{todobox}{E3: choose the three limitations to say out loud (3 minutes)}
+    Fill \repofile{notes/theory/e3-compression-and-contamination.md}; keep the rest for questions.
+  \end{todobox}
+\end{frame}

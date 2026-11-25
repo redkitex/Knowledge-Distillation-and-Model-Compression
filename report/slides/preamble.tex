@@ -1,0 +1,206 @@
+% =====================================================================
+% preamble.tex -- shared look and helper commands for the B3 slide deck
+% Owner: T3 (slides lead). Change this file only after telling the team:
+% every section file depends on the colours and macros below.
+% Compile with pdfLaTeX (Overleaf default).
+% =====================================================================
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,shapes.geometric,fit,backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{listings}
+\usepackage[most]{tcolorbox}
+\usepackage{appendixnumberbeamer}
+
+% ---------------------------------------------------------------------
+% Colour palette (light theme)
+% ---------------------------------------------------------------------
+\definecolor{kdnavy}{HTML}{1F3A5F}    % headings
+\definecolor{kdblue}{HTML}{2F6DB5}    % structure, main data series
+\definecolor{kdpale}{HTML}{EAF1FB}    % title band, block titles
+\definecolor{kdpaler}{HTML}{F5F8FD}   % block bodies
+\definecolor{kdteal}{HTML}{178F87}    % second data series, "Ours"
+\definecolor{kdorange}{HTML}{D9731A}  % accent, baselines, to-do boxes
+\definecolor{kdred}{HTML}{C0392B}     % errors, warnings
+\definecolor{kdgray}{HTML}{5B6575}    % muted text
+\definecolor{kdlight}{HTML}{F2F4F7}   % footline
+\definecolor{kdink}{HTML}{1E2430}     % body text
+\definecolor{kdcode}{HTML}{F6F8FA}    % code background
+\definecolor{kdtodo}{HTML}{FFF6E8}    % to-do box background
+
+% ---------------------------------------------------------------------
+% Beamer colours, fonts and templates
+% ---------------------------------------------------------------------
+\setbeamertemplate{navigation symbols}{}
+\setbeamercolor{normal text}{fg=kdink,bg=white}
+\setbeamercolor{structure}{fg=kdblue}
+\setbeamercolor{alerted text}{fg=kdorange}
+\setbeamercolor{frametitle}{fg=kdnavy,bg=kdpale}
+\setbeamercolor{framesubtitle}{fg=kdgray}
+\setbeamercolor{title}{fg=kdnavy}
+\setbeamercolor{subtitle}{fg=kdblue}
+\setbeamercolor{block title}{fg=kdnavy,bg=kdpale}
+\setbeamercolor{block body}{fg=kdink,bg=kdpaler}
+\setbeamercolor{block title alerted}{fg=white,bg=kdorange}
+\setbeamercolor{block body alerted}{fg=kdink,bg=kdtodo}
+\setbeamercolor{block title example}{fg=white,bg=kdteal}
+\setbeamercolor{block body example}{fg=kdink,bg=kdteal!6}
+\setbeamercolor{footline}{fg=kdgray,bg=kdlight}
+\setbeamercolor{item}{fg=kdblue}
+\setbeamercolor{section in toc}{fg=kdnavy}
+\setbeamercolor{section in toc shaded}{fg=kdgray}
+
+\setbeamerfont{frametitle}{size=\large,series=\bfseries}
+\setbeamerfont{framesubtitle}{size=\footnotesize,series=\mdseries}
+\setbeamerfont{footline}{size=\tiny}
+\setbeamerfont{block title}{size=\small,series=\bfseries}
+
+\setbeamertemplate{itemize items}[circle]
+\setbeamertemplate{enumerate items}[default]
+\setbeamertemplate{blocks}[rounded]
+\setbeamertemplate{section in toc}[sections numbered]
+\setbeamertemplate{section in toc shaded}[default][40]
+
+% Frame title: a pale band across the slide with a thin blue rule below.
+\makeatletter
+\setbeamertemplate{frametitle}{%
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\paperwidth,leftskip=0.5cm,rightskip=0.5cm,sep=0.2cm]{frametitle}%
+    \usebeamerfont{frametitle}\strut\insertframetitle\strut
+    \ifx\insertframesubtitle\@empty\else
+      \par{\usebeamerfont{framesubtitle}\usebeamercolor[fg]{framesubtitle}\insertframesubtitle\strut\par}%
+    \fi
+  \end{beamercolorbox}%
+  \nointerlineskip
+  \hbox{\color{kdblue}\rule{\paperwidth}{0.6pt}}%
+  \vskip0.1cm
+}
+\makeatother
+
+% Footline: project name, current section, slide number.
+\setbeamertemplate{footline}{%
+  \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=.40\paperwidth,ht=2.4ex,dp=1ex,leftskip=0.5cm]{footline}%
+      \usebeamerfont{footline}Project B3 $\cdot$ Knowledge Distillation
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.40\paperwidth,ht=2.4ex,dp=1ex,center]{footline}%
+      \usebeamerfont{footline}\insertsectionhead
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.20\paperwidth,ht=2.4ex,dp=1ex,right,rightskip=0.5cm]{footline}%
+      \usebeamerfont{footline}\insertframenumber{} / \inserttotalframenumber
+    \end{beamercolorbox}}%
+  \vskip0pt%
+}
+
+% Section divider: big number, section title, presenter and minutes,
+% and the roadmap with the current section highlighted.
+% Each section file sets \sectioninfo just before its \section command.
+\newcommand{\sectioninfo}{}
+\AtBeginSection[]{%
+  \begin{frame}[plain,noframenumbering]
+    \begin{tikzpicture}[remember picture,overlay]
+      \fill[kdpaler] (current page.north west) rectangle (current page.south east);
+      \fill[kdblue] (current page.north west) rectangle ([xshift=0.22cm]current page.south west);
+    \end{tikzpicture}%
+    \begin{columns}[c]
+      \begin{column}{0.52\textwidth}
+        {\color{kdblue}\fontsize{38}{40}\selectfont\bfseries\thesection\par}
+        \vspace{0.2cm}
+        {\color{kdnavy}\Large\bfseries\insertsectionhead\par}
+        \vspace{0.3cm}
+        {\color{kdgray}\normalsize\sectioninfo\par}
+      \end{column}
+      \begin{column}{0.42\textwidth}
+        \scriptsize\tableofcontents[currentsection,hideallsubsections]
+      \end{column}
+    \end{columns}
+  \end{frame}
+}
+
+% ---------------------------------------------------------------------
+% Helper commands used on the slides
+% ---------------------------------------------------------------------
+% Small coloured labels for frame titles:
+%   \est  = claim taken from the literature
+%   \ours = result from our own runs (a file in results/)
+%   \who{T3} = who presents this slide
+\newcommand{\badge}[2]{{\setlength{\fboxsep}{1.6pt}\colorbox{#1}{\textcolor{white}{\scriptsize\bfseries\strut #2}}}}
+\newcommand{\est}{\badge{kdblue}{Established}}
+\newcommand{\ours}{\badge{kdteal}{Ours}}
+\newcommand{\who}[1]{\badge{kdgray}{#1}}
+% A source in grey after a statement: \src{Hinton et al., 2015}
+\newcommand{\src}[1]{{\color{kdgray}\scriptsize(#1)}}
+% Arm names in typewriter type
+\newcommand{\arm}[1]{\texttt{#1}}
+% A path or file in the repository (not \path: TikZ already uses that name)
+\newcommand{\repofile}[1]{{\color{kdnavy}\texttt{#1}}}
+
+% To-do box: marks content that is missing from the repository or still
+% has to be written. Replace the box with real content when it exists.
+%   \begin{todobox}{Seed 1 results (T1)} what is needed ... \end{todobox}
+\newtcolorbox{todobox}[1]{enhanced,colback=kdtodo,colframe=kdorange,
+  boxrule=0.6pt,arc=2pt,left=5pt,right=5pt,top=3pt,bottom=3pt,
+  coltitle=white,colbacktitle=kdorange,fonttitle=\bfseries\scriptsize,
+  title={To add: #1},fontupper=\scriptsize}
+
+% Info box for short key messages
+\newtcolorbox{keybox}{enhanced,colback=kdpale,colframe=kdblue,
+  boxrule=0.6pt,arc=2pt,left=6pt,right=6pt,top=4pt,bottom=4pt,fontupper=\small}
+
+% ---------------------------------------------------------------------
+% TikZ helpers
+% ---------------------------------------------------------------------
+% "visible on=<2->" shows a TikZ element from overlay 2 onwards while
+% keeping its space reserved, so the picture does not jump.
+\tikzset{
+  invisible/.style={opacity=0,text opacity=0},
+  visible on/.style={alt={#1{}{invisible}}},
+  alt/.code args={<#1>#2#3}{\alt<#1>{\pgfkeysalso{#2}}{\pgfkeysalso{#3}}},
+  stage/.style={draw=kdblue,fill=kdpale,rounded corners=3pt,align=center,
+    font=\scriptsize,text width=1.85cm,minimum height=1.15cm,inner sep=3pt},
+  stageT/.style={stage,draw=kdteal,fill=kdteal!8},
+  stageX/.style={stage,draw=kdorange,fill=kdtodo,dashed},
+  flow/.style={-{Stealth[length=2mm]},thick,draw=kdgray},
+  filelabel/.style={font=\tiny\ttfamily,text=kdgray,align=center},
+}
+
+% pgfplots defaults for this deck
+\pgfplotsset{
+  kdaxis/.style={
+    axis line style={kdgray},
+    tick style={kdgray},
+    tick label style={font=\scriptsize,text=kdink},
+    label style={font=\scriptsize,text=kdink},
+    legend style={font=\scriptsize,draw=none,fill=none},
+    title style={font=\small\bfseries,text=kdnavy},
+    major grid style={kdlight},
+  },
+}
+
+% ---------------------------------------------------------------------
+% Code listings
+% ---------------------------------------------------------------------
+\lstdefinestyle{kdpy}{
+  language=Python,
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{kdblue}\bfseries,
+  commentstyle=\color{kdgray}\itshape,
+  stringstyle=\color{kdteal},
+  backgroundcolor=\color{kdcode},
+  frame=single,framerule=0.4pt,rulecolor=\color{kdpale},
+  xleftmargin=3pt,xrightmargin=3pt,
+  showstringspaces=false,columns=fullflexible,keepspaces=true,
+  breaklines=true,tabsize=4,aboveskip=3pt,belowskip=3pt,upquote=true,
+}
+\lstdefinestyle{kdplain}{
+  style=kdpy,language={},
+  morecomment=[l]{\#},
+}
+\lstset{style=kdpy}

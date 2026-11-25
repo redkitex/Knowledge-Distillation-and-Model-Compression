@@ -1,0 +1,357 @@
+% =====================================================================
+% 05-design.tex -- Experiment design and pipeline.
+% T3 4 min (pipeline, setup, settings, headroom), T2 2 min (arms, text),
+% T1 4 min (fairness, on-policy step, loss).
+% Sources: configs/default.yaml, src/kd/{data,train,losses}.py,
+%          data/teacher_sequences.meta.json, results/runs/pilot_onpolicy_*,
+%          notebooks/archive/headroom-test.ipynb
+% =====================================================================
+\renewcommand{\sectioninfo}{Presenters: T3 (4 min), T2 (2 min), T1 (4 min)}
+\section{Experiment design and pipeline}
+
+% ------------------------------------------------------------- T3
+\begin{frame}{The whole pipeline, from question to slide\hfill\who{T3}}
+  \centering
+  \begin{tikzpicture}[node distance=0.46cm,stage/.append style={text width=1.6cm}]
+    \node[stage] (s1) {\textbf{GSM8K}\\7,473 train\\1,319 test};
+    \node[stage,right=of s1,visible on=<2->] (s2) {\textbf{Teacher answers}\\2,000, made once};
+    \node[stageT,right=of s2,visible on=<3->] (s3) {\textbf{Train}\\4 arms $\times$ 3 seeds\\500 steps each};
+    \node[stage,right=of s3,visible on=<4->] (s4) {\textbf{Evaluate}\\1,319 questions\\greedy};
+    \node[stage,right=of s4,visible on=<5->] (s5) {\textbf{Statistics}\\CIs, paired tests};
+    \node[stageX,right=of s5,visible on=<6->] (s6) {\textbf{Figures, note, slides}};
+    % arrows
+    \draw[flow,visible on=<2->] (s1) -- (s2);
+    \draw[flow,visible on=<3->] (s2) -- (s3);
+    \draw[flow,visible on=<4->] (s3) -- (s4);
+    \draw[flow,visible on=<5->] (s4) -- (s5);
+    \draw[flow,visible on=<6->] (s5) -- (s6);
+    % owners
+    \tikzset{owner/.style={font=\tiny\bfseries,text=kdgray}}
+    \node[owner,above=0.04cm of s1] {T2};
+    \node[owner,above=0.04cm of s2,visible on=<2->] {T2};
+    \node[owner,above=0.04cm of s3,visible on=<3->] {T1 + T3};
+    \node[owner,above=0.04cm of s4,visible on=<4->] {E2};
+    \node[owner,above=0.04cm of s5,visible on=<5->] {E1};
+    \node[owner,above=0.04cm of s6,visible on=<6->] {E3};
+    % files
+    \node[filelabel,below=0.06cm of s1] {src/kd/data.py};
+    \node[filelabel,below=0.06cm of s2,visible on=<2->] {10\_cache\_teacher\\\_sequences.py};
+    \node[filelabel,below=0.06cm of s3,visible on=<3->] (f3) {20\_train.py\\kd/train.py};
+    \node[filelabel,below=0.06cm of s4,visible on=<4->] (f4) {30\_evaluate.py};
+    \node[filelabel,below=0.06cm of s5,visible on=<5->] {kd/stats.py};
+    \node[filelabel,below=0.06cm of s6,visible on=<6->,text=kdorange] {40\_make\_figures.py\\(still empty)};
+    % Kaggle bracket over the GPU stages
+    \draw[kdblue,thick,visible on=<3->] ($(s2.north west)+(0,0.52)$) -- ($(s4.north east)+(0,0.52)$);
+    \node[font=\tiny,text=kdblue,fill=white,visible on=<3->] at ($(s3.north)+(0,0.52)$) {on Kaggle, GPU T4 x2};
+    % run log
+    \node[draw=kdteal,fill=kdteal!8,rounded corners=2pt,font=\tiny,align=center,visible on=<4->] (log)
+      at ($(s3.south)!0.5!(s4.south)+(0,-1.15)$)
+      {\texttt{results/run\_log.csv} \;+\; \texttt{results/runs/<run\_id>/}\\
+       commit, config hash, time, predictions, training log};
+    \draw[flow,kdteal,visible on=<4->] (f3.south) -- (f3.south |- log.north);
+    \draw[flow,kdteal,visible on=<4->] (f4.south) -- (f4.south |- log.north);
+  \end{tikzpicture}
+  \vspace{0.1cm}
+
+  {\scriptsize Every step is a numbered script; the Kaggle notebook only clones the repo at a fixed commit and calls them.}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Models, data and compute\hfill\who{T3}}
+  \begin{columns}[T]
+    \begin{column}{0.6\textwidth}
+      \footnotesize
+      \renewcommand{\arraystretch}{1.2}
+      \begin{tabular}{@{}>{\bfseries}l>{\raggedright\arraybackslash}p{5.6cm}@{}}
+        \toprule
+        Teacher & Qwen3-4B, frozen, fp16 on GPU 1 (about 8 GB) \\
+        Student & Qwen3-0.6B, all weights trained, fp32 weights with fp16
+                  compute on GPU 0 (about 11 GB) \\
+        Training data & a fixed pool of 2,000 GSM8K training questions \\
+        Test data & all 1,319 GSM8K test questions \\
+        Prompt & ``Solve the problem step by step. Put the final number
+                 at the end.'' (thinking mode off) \\
+        Updates & 500 steps of 4 questions; AdamW, learning rate
+                  $5\cdot10^{-6}$, gradient clip 1.0 \\
+        Seeds & 1, 2, 3: change the question order and the sampling \\
+        Hardware & Kaggle, 2 $\times$ T4 (16 GB each), one free account per member \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.36\textwidth}
+      \begin{block}{Why these models}
+        \footnotesize
+        \begin{itemize}
+          \item Largest pair that fits on free Kaggle GPUs: teacher
+                (8 GB) and training student (11 GB) need one T4 each.
+          \item Same family: one tokenizer and vocabulary, so the
+                distributions can be compared token by token.
+          \item GSM8K: graded automatically by the final number.
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Settings we locked, and why\hfill\ours\ \who{T3}}
+  \begin{columns}[T]
+    \begin{column}{0.53\textwidth}
+\begin{lstlisting}[style=kdplain]
+# configs/default.yaml  (commit f2accc6)
+data:
+  pool_size: 2000         # fixed questions
+train:
+  questions_per_step: 4   # 500 steps
+  lr: 5.0e-6              # pilot sweep
+  loss: forward_kl        # hard-label: cross-entropy
+  temperature: 1.0        # distillation T
+  oom_retries: 2          # retry, never skip
+generation:
+  max_new_tokens: 512     # 384 cut 14% of teacher
+  sampling: {temperature: 0.7, top_p: 0.8, top_k: 20}
+\end{lstlisting}
+      {\tiny\color{kdgray} Config hash of every main run: \texttt{85bee6cac023}}
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \footnotesize
+      \textbf{Pilot sweep}: on-policy arm, seed 1, 100 steps, accuracy
+      on all 1,319 test questions.
+      \vspace{0.1cm}
+
+      \centering
+      \begin{tabular}{@{}lr@{\qquad}lr@{}}
+        \toprule
+        lr & acc.\ \% & sampling $T$ & acc.\ \% \\
+        \midrule
+        $5\cdot10^{-6}$ & \textbf{65.6} & 0.5 & 64.5 \\
+        $1\cdot10^{-5}$ & 60.6 & \textbf{0.7} & \textbf{65.6} \\
+        $2\cdot10^{-5}$ & 50.2 & 1.0 & 63.5 \\
+        \bottomrule
+      \end{tabular}
+
+      \raggedright
+      \vspace{0.15cm}
+      Larger steps pulled the already tuned student away from what it did
+      well. Caveat: chosen on the on-policy arm and on the test set
+      (see limitations).
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Is there anything to distil? The headroom test\hfill\ours\ \who{T3}}
+  \begin{columns}[c]
+    \begin{column}{0.45\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[kdaxis,width=6.0cm,height=5.0cm,
+            ybar,bar width=26pt,ymin=0,ymax=100,
+            symbolic x coords={teacher,student},xtick=data,
+            xticklabels={Qwen3-4B,Qwen3-0.6B},
+            ylabel={accuracy (\%), 300 test questions},
+            enlarge x limits=0.55,ymajorgrids]
+          \addplot[fill=kdblue,draw=kdblue,
+              error bars/.cd,y dir=both,y explicit,error bar style={kdnavy,thick}]
+            coordinates {(teacher,83.0) +=(0,3.8) -=(0,4.7)
+                         (student,56.7) +=(0,5.5) -=(0,5.7)};
+          \node[font=\scriptsize\bfseries,text=kdnavy] at (axis cs:teacher,93) {83.0};
+          \node[font=\scriptsize\bfseries,text=kdnavy] at (axis cs:student,67) {56.7};
+        \end{axis}
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.52\textwidth}
+      \small
+      \begin{itemize}
+        \item Before training anything: are the two models far enough apart?
+        \item Zero-shot, greedy, the same 300 random test questions,
+              95\% Wilson intervals.
+        \item Paired gap: \textbf{+26.3 points}, bootstrap 95\% CI
+              [21.0, 31.7]. Rule agreed in advance: proceed if the gap is at
+              least 10 points and the CI excludes 0.
+        \item On all 1,319 questions with 512 tokens the untrained student
+              scores \textbf{62.0\%} [59.4, 64.6]: our real baseline.
+      \end{itemize}
+      \begin{todobox}{Teacher on the full test set (E2)}
+        \arm{ref\_teacher} is still \emph{planned} in the run log. Its accuracy
+        on all 1,319 questions replaces the 300-question number here.
+      \end{todobox}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------- T2
+\begin{frame}{Four arms, one difference\hfill\who{T2}}
+  \small
+  \renewcommand{\arraystretch}{1.25}
+  \begin{tabular}{@{}l>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{3.8cm}l@{}}
+    \toprule
+    \textbf{Arm} & \textbf{Training text} & \textbf{Target} & \textbf{Teacher model} \\
+    \midrule
+    \uncover<1->{\arm{human}} & \uncover<1->{cleaned GSM8K solutions} & \uncover<1->{forward KL to the teacher} & \uncover<1->{needed} \\
+    \uncover<2->{\arm{teacher}} & \uncover<2->{teacher answers, generated once (greedy)} & \uncover<2->{forward KL to the teacher} & \uncover<2->{needed} \\
+    \uncover<3->{\arm{onpolicy}} & \uncover<3->{the student's own answers, new at every step} & \uncover<3->{forward KL to the teacher} & \uncover<3->{needed} \\
+    \uncover<4->{\arm{ref\_hardlabel}} & \uncover<4->{cleaned GSM8K solutions} & \uncover<4->{cross-entropy on the correct token} & \uncover<4->{not used} \\
+    \midrule
+    \uncover<5->{\arm{ref\_student0}} & \multicolumn{3}{l}{\uncover<5->{reference: the untrained student, evaluated once}} \\
+    \uncover<5->{\arm{ref\_teacher}} & \multicolumn{3}{l}{\uncover<5->{reference: the teacher itself \textcolor{kdorange}{(not evaluated yet)}}} \\
+    \bottomrule
+  \end{tabular}
+  \vspace{0.25cm}
+  \begin{uncoverenv}<6->
+  \begin{keybox}
+    \footnotesize Identical in every arm: the 2,000 questions, their order, 500 steps, optimizer,
+    learning rate, maximum length. The \textbf{only} difference is the training text
+    (and the target, for the hard-label reference).
+  \end{keybox}
+  \end{uncoverenv}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{Building the training text\hfill\who{T2}}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \scriptsize\textbf{Raw GSM8K solution}
+\begin{lstlisting}[style=kdplain]
+Natalia sold 48/2 = <<48/2=24>>24 clips in May.
+Natalia sold 48+24 = <<48+24=72>>72 clips
+altogether in April and May.
+#### 72
+\end{lstlisting}
+      \scriptsize\textbf{After \texttt{clean\_solution()}} (\repofile{src/kd/data.py})
+\begin{lstlisting}[style=kdplain]
+Natalia sold 48/2 = 24 clips in May.
+Natalia sold 48+24 = 72 clips
+altogether in April and May.
+The final answer is 72.
+\end{lstlisting}
+      \tiny Calculator notes removed; the last number is always the answer,
+      so the grading rule marks every cleaned solution correct.
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Teacher answers \ours}
+        \footnotesize
+        \begin{itemize}
+          \item Generated once for all 2,000 pool questions, greedy,
+                512 tokens, not filtered for correctness
+          \item 92.1\% correct, mean 260 tokens, 2\% cut off
+          \item About 1.5 hours on one Kaggle session; committed as
+                \repofile{data/teacher\_sequences.jsonl}
+        \end{itemize}
+      \end{block}
+      \begin{block}{On-policy answers}
+        \footnotesize
+        The student samples 4 new answers at every step
+        (temperature 0.7, top-p 0.8, top-k 20), so this text changes as
+        the student learns.
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------- T1
+\begin{frame}[fragile]{Equal updates: keeping the arms fair\hfill\who{T1}}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+\begin{lstlisting}
+def question_order(question_ids, seed, epochs=1):
+    """The order of the pool: depends ONLY on the seed."""
+    # own generator, untouched by on-policy sampling
+    rng = random.Random(f"data-order:{seed}")
+    order = []
+    for _ in range(epochs):
+        ids = sorted(question_ids)
+        rng.shuffle(ids)
+        order.extend(ids)
+    return order
+
+def question_ids_hash(question_ids):
+    """Fingerprint of one step; must match across arms."""
+    return hashlib.sha256(
+        ",".join(question_ids).encode()).hexdigest()[:16]
+\end{lstlisting}
+      {\tiny\color{kdgray} From \texttt{src/kd/train.py}}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \footnotesize
+      Two bugs in our first notebook made the comparison unfair:
+      \begin{enumerate}
+        \item<2-> \textbf{Shared randomness}: one global generator set the
+              order \emph{and} the sampling, so arms saw different orders.
+              Now each has its own generator.
+        \item<3-> \textbf{Skipped steps}: an out-of-memory error skipped a
+              step. Now the same step is retried, and the run stops after
+              two failures.
+      \end{enumerate}
+      \begin{uncoverenv}<4->
+      \begin{block}{Checked on our runs \ours}
+        \scriptsize Seeds 2 and 3: identical question hashes in all four arms
+        at all 500 steps, 0 skipped steps (\texttt{fairness\_check} in
+        \repofile{kd/stats.py}).
+      \end{block}
+      \end{uncoverenv}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{One on-policy training step\hfill\who{T1}}
+  \centering
+  \begin{tikzpicture}[node distance=0.62cm,
+      box/.style={draw=kdblue,fill=kdpale,rounded corners=3pt,align=left,
+                  font=\scriptsize,text width=2.55cm,minimum height=2.1cm,inner sep=4pt}]
+    \node[box] (a) {\textbf{1. Student writes}\\GPU 0, no gradients\\4 answers, sampled\\up to 512 tokens};
+    \node[box,right=of a,visible on=<2->] (b) {\textbf{2. Teacher scores}\\GPU 1, no gradients\\its full distribution\\at every token};
+    \node[box,right=of b,visible on=<3->,draw=kdteal,fill=kdteal!8] (c) {\textbf{3. Student scores}\\GPU 0, with gradients\\forward KL per token,\\averaged over the step};
+    \node[box,right=of c,visible on=<4->] (d) {\textbf{4. Update}\\one AdamW step\\lr $5\cdot10^{-6}$, clip 1.0\\then 4 new questions};
+    \draw[flow,visible on=<2->] (a) -- (b);
+    \draw[flow,visible on=<3->] (b) -- (c);
+    \draw[flow,visible on=<4->] (c) -- (d);
+    \draw[flow,kdorange,visible on=<5->] (d.south) -- ++(0,-0.45) -| (a.south)
+      node[pos=0.25,below,font=\tiny,text=kdorange] {repeat 500 times};
+  \end{tikzpicture}
+  \vspace{0.3cm}
+
+  \small
+  \begin{itemize}
+    \item<5-> The other arms skip step 1: their text is fixed (a cleaned solution
+          or a cached teacher answer). Steps 2 to 4 are identical.
+    \item<6-> Step 1 takes most of the time: 18.8 to 21.5 of the 21.5 to 23.9
+          seconds per on-policy step (87 to 90\%), against 1.5 to 2.3 seconds
+          per step for the other arms \ours.
+  \end{itemize}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}[fragile]{The loss in code\hfill\who{T1}}
+\begin{lstlisting}
+def forward_kl(student_logits, teacher_logits, temperature=1.0):
+    """KL(teacher || student) per token: the classic distillation target."""
+    log_p_s = F.log_softmax(student_logits.float() / temperature, dim=-1)
+    log_p_t = F.log_softmax(teacher_logits.float() / temperature, dim=-1)
+    return (log_p_t.exp() * (log_p_t - log_p_s)).sum(dim=-1)
+
+# inside distillation_loss(): only answer tokens count
+s_logits, targets = response_positions(student_logits, input_ids, response_mask)
+per_token = forward_kl(s_logits, t_logits, temperature) * temperature ** 2
+return per_token.sum() / normalizer   # average over every answer token of the step
+\end{lstlisting}
+  {\tiny\color{kdgray} From \texttt{src/kd/losses.py}}
+  \vspace{0.1cm}
+
+  \begin{columns}[T]
+    \begin{column}{0.32\textwidth}
+      \footnotesize\textbf{Alignment.} Logits at position $t$ predict token
+      $t+1$; getting this wrong is the most common silent bug.
+    \end{column}
+    \begin{column}{0.32\textwidth}
+      \footnotesize\textbf{Masking.} Prompt and padding never count; the
+      average runs over all answer tokens of the step.
+    \end{column}
+    \begin{column}{0.32\textwidth}
+      \footnotesize\textbf{Tested.} KL is 0 for identical logits, matches
+      \texttt{torch}'s \texttt{kl\_div}, ignores masked positions
+      (10 tests).
+    \end{column}
+  \end{columns}
+\end{frame}

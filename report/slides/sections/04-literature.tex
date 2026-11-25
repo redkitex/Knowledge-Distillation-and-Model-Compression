@@ -1,0 +1,75 @@
+% =====================================================================
+% 04-literature.tex -- What the literature establishes.  E2, 8 min
+% Sources: Sources/README.md (literature table), report/references.bib,
+%          notes/emre-notes-on-sources.txt.
+% Theory note: notes/theory/e2-literature-map-gsm8k-grading.md
+% Rule from the brief: group papers by the question they answer, do not
+% present one paper per slide.
+% =====================================================================
+\renewcommand{\sectioninfo}{Presenter: E2 \quad $\cdot$ \quad 8 minutes}
+\section{What the literature establishes}
+
+% ------------------------------------------------------------------
+\begin{frame}{Five questions, and what is known about each\hfill\est\ \who{E2}}
+  \scriptsize
+  \renewcommand{\arraystretch}{1.25}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{2.8cm}>{\raggedright\arraybackslash}p{4.0cm}>{\raggedright\arraybackslash}p{6.2cm}@{}}
+    \toprule
+    \textbf{Question} & \textbf{Key sources} & \textbf{What they establish} \\
+    \midrule
+    \uncover<1->{Do soft targets help?} & \uncover<1->{Hinton et al. 2015; Furlanello et al. 2018}
+      & \uncover<1->{Teacher probabilities carry information beyond the label; a same-size student can even beat its teacher.} \\
+    \uncover<2->{Can a student learn from teacher text alone?} & \uncover<2->{Kim and Rush 2016; DeepSeek-AI 2025}
+      & \uncover<2->{Yes: training on teacher-written sequences works, up to large reasoning models.} \\
+    \uncover<3->{Does training on its own text help?} & \uncover<3->{Agarwal et al. 2024 (GKD); Gu et al. 2024 (MiniLLM); Qwen Team 2025; Lu and Thinking Machines 2025}
+      & \uncover<3->{On-policy distillation beats off-policy on several tasks; the best divergence depends on the task.} \\
+    \uncover<4->{Why could it help?} & \uncover<4->{Bengio et al. 2015; Ross et al. 2011}
+      & \uncover<4->{Exposure bias: models trained only on correct prefixes compound their own errors.} \\
+    \uncover<5->{How do we measure it fairly?} & \uncover<5->{Cobbe et al. 2021; Miller 2024; Stanton et al. 2021; Wu et al. 2025}
+      & \uncover<5->{GSM8K is graded by its final number; scores need error bars and paired tests; fidelity is not accuracy; public benchmarks may be contaminated.} \\
+    \bottomrule
+  \end{tabular}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{What is still open, and where we fit\hfill\est\ \who{E2}}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \begin{block}{Open points in the literature}
+        \footnotesize
+        \begin{itemize}
+          \item On-policy distillation helps only when teacher and student
+                ``think'' compatibly and the teacher knows something new;
+                same-family pairs can look identical
+                \src{Li et al., 2026}.
+          \item Recommended recipe: off-policy warm-up, then on-policy
+                \src{Song and Zheng, 2026}.
+          \item Published comparisons change several things at once
+                (data, target, compute), so the source of the text is
+                rarely isolated.
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \begin{block}{Our contribution}
+        \footnotesize
+        \begin{itemize}
+          \item One target for every arm (forward KL to the teacher's full
+                distribution).
+          \item Equal updates, identical questions in identical order.
+          \item A small, cheap setting: a 0.6B student, a 4B teacher,
+                free Kaggle GPUs, three seeds.
+          \item Checked that there is something to distil first
+                (headroom test, part 5).
+        \end{itemize}
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vspace{0.15cm}
+  \begin{todobox}{E2's literature map (theory note is still empty)}
+    Fill \repofile{notes/theory/e2-literature-map-gsm8k-grading.md}. Verify every
+    reference against the paper itself (the bib file says ``verify''); Ross et al.
+    2011, Li et al. 2026 and Song and Zheng 2026 still need entries in
+    \repofile{report/references.bib}.
+  \end{todobox}
+\end{frame}

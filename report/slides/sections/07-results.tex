@@ -1,0 +1,283 @@
+% =====================================================================
+% 07-results.tex -- Results.  E1 6 min (accuracy, seeds, differences),
+% E3 4 min (cost, length, size and speed)
+%
+% Numbers: python -m kd.stats (src/kd/stats.py, E1) on results/runs/,
+% seeds 2 and 3 plus ref_student0, computed on Nov 25.
+% When seed 1 and ref_teacher arrive: rerun kd.stats and update the
+% coordinates below (or replace the charts with the PNGs from
+% scripts/40_make_figures.py once E3 has written it).
+% =====================================================================
+\renewcommand{\sectioninfo}{Presenters: E1 (6 min), E3 (4 min)}
+\section{Results}
+
+% ------------------------------------------------------------- E1
+\begin{frame}{On-policy text beats every other source\hfill\ours\ \who{E1}}
+  \begin{columns}[c]
+    \begin{column}{0.6\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[kdaxis,width=8.2cm,height=5.6cm,
+            ybar,bar width=11pt,ymin=30,ymax=80,
+            symbolic x coords={human,teacher,onpolicy,hardlabel},xtick=data,
+            xticklabels={human text,teacher text,on-policy,hard labels},
+            ylabel={accuracy on 1,319 test questions (\%)},
+            enlarge x limits=0.16,ymajorgrids,
+            legend style={at={(0.02,0.98)},anchor=north west},legend cell align=left]
+          \addplot[fill=kdteal,draw=kdteal,
+              error bars/.cd,y dir=both,y explicit,error bar style={kdink}]
+            coordinates {(human,56.8) +=(0,2.6) -=(0,2.7)
+                         (teacher,60.2) +=(0,2.6) -=(0,2.7)
+                         (onpolicy,68.3) +=(0,2.5) -=(0,2.6)
+                         (hardlabel,41.2) +=(0,2.6) -=(0,2.7)};
+          \addplot[fill=kdblue,draw=kdblue,
+              error bars/.cd,y dir=both,y explicit,error bar style={kdink}]
+            coordinates {(human,60.1) +=(0,2.6) -=(0,2.6)
+                         (teacher,62.5) +=(0,2.5) -=(0,2.7)
+                         (onpolicy,69.1) +=(0,2.5) -=(0,2.5)
+                         (hardlabel,42.8) +=(0,2.7) -=(0,2.6)};
+          \draw[kdorange,thick,dashed] (rel axis cs:0,0.64) -- (rel axis cs:1,0.64);
+          \node[font=\tiny,text=kdorange,anchor=south east] at (rel axis cs:1,0.64) {untrained student 62.0};
+          \legend{seed 2, seed 3}
+        \end{axis}
+      \end{tikzpicture}
+
+      {\tiny\color{kdgray} Bars: accuracy; whiskers: 95\% Wilson intervals. Seed 1 not yet available.}
+    \end{column}
+    \begin{column}{0.37\textwidth}
+      \small
+      \begin{itemize}
+        \item<1-> \arm{onpolicy}: 68.3\% and 69.1\%, about \textbf{7 points above}
+              the untrained student.
+        \item<2-> Teacher and human text: \textbf{no gain}, around or below
+              the untrained student.
+        \item<3-> Hard labels on the same human text: \textbf{about 20 points
+              lower}.
+      \end{itemize}
+      \begin{todobox}{Seed 1 (T1)}
+        Add \arm{human\_s1}, \arm{teacher\_s1}, \arm{onpolicy\_s1},
+        \arm{ref\_hardlabel\_s1} as a third bar per arm once pushed.
+      \end{todobox}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Every arm and seed, with intervals\hfill\ours\ \who{E1}}
+  \centering\footnotesize
+  \renewcommand{\arraystretch}{1.25}
+  \begin{tabular}{@{}l c c c r@{}}
+    \toprule
+    \textbf{Arm} & \textbf{Seed 1} & \textbf{Seed 2} & \textbf{Seed 3} & \textbf{Mean} \\
+    \midrule
+    \arm{human}         & \textcolor{kdorange}{missing} & 56.8 \;[54.1, 59.4] & 60.1 \;[57.5, 62.7] & 58.5 \\
+    \arm{teacher}       & \textcolor{kdorange}{missing} & 60.2 \;[57.5, 62.8] & 62.5 \;[59.8, 65.0] & 61.3 \\
+    \arm{onpolicy}      & \textcolor{kdorange}{missing} & \textbf{68.3} \;[65.7, 70.8] & \textbf{69.1} \;[66.6, 71.6] & \textbf{68.7} \\
+    \arm{ref\_hardlabel} & \textcolor{kdorange}{missing} & 41.2 \;[38.5, 43.8] & 42.8 \;[40.2, 45.5] & 42.0 \\
+    \midrule
+    \arm{ref\_student0} & \multicolumn{3}{c}{62.0 \;[59.4, 64.6] \quad untrained student} & \\
+    \arm{ref\_teacher} & \multicolumn{3}{c}{\textcolor{kdorange}{Qwen3-4B: not evaluated on all 1,319 questions yet}} & \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{0.2cm}
+  {\scriptsize Accuracy in \%, all 1,319 test questions, 95\% Wilson intervals in brackets;
+  mean over the two seeds available.
+  Seed-to-seed spread: 0.8 (on-policy) to 3.3 points (human).}
+  \vspace{0.15cm}
+
+  \begin{todobox}{Seed 1 column and the three-seed mean (T1, then E1)}
+    Fill the seed 1 column from \repofile{python -m kd.stats} and change the last column
+    to the mean and range of three seeds.
+  \end{todobox}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Which differences are real? Paired comparisons\hfill\ours\ \who{E1}}
+  \centering
+  \begin{tikzpicture}
+    \begin{axis}[kdaxis,width=12.2cm,height=6.1cm,
+        xmin=-26,xmax=22,ymin=0.4,ymax=8.6,y dir=reverse,
+        ytick={1,...,8},
+        yticklabels={on-policy $-$ untrained, teacher $-$ untrained, human $-$ untrained,
+                     hard labels $-$ untrained, on-policy $-$ teacher, on-policy $-$ human,
+                     teacher $-$ human, human $-$ hard labels},
+        xlabel={difference in accuracy (percentage points), 95\% paired bootstrap interval},
+        xmajorgrids,
+        legend style={at={(0.99,0.03)},anchor=south east},legend cell align=left]
+      \addplot[only marks,mark=*,mark size=1.8pt,color=kdteal,
+          error bars/.cd,x dir=both,x explicit,error bar style={kdteal,thick}]
+        coordinates {
+          (6.3,0.85) +=(2.4,0) -=(2.4,0)
+          (-1.8,1.85) +=(2.5,0) -=(2.7,0)
+          (-5.2,2.85) +=(2.6,0) -=(2.8,0)
+          (-20.8,3.85) +=(2.9,0) -=(3.1,0)
+          (8.1,4.85) +=(2.4,0) -=(2.4,0)
+          (11.5,5.85) +=(2.6,0) -=(2.6,0)
+          (3.4,6.85) +=(2.8,0) -=(2.8,0)
+          (15.6,7.85) +=(3.1,0) -=(3.1,0)};
+      \addplot[only marks,mark=square*,mark size=1.7pt,color=kdblue,
+          error bars/.cd,x dir=both,x explicit,error bar style={kdblue,thick}]
+        coordinates {
+          (7.1,1.15) +=(2.5,0) -=(2.5,0)
+          (0.5,2.15) +=(2.5,0) -=(2.6,0)
+          (-1.9,3.15) +=(2.6,0) -=(2.6,0)
+          (-19.2,4.15) +=(3.1,0) -=(3.0,0)
+          (6.7,5.15) +=(2.5,0) -=(2.5,0)
+          (9.0,6.15) +=(2.7,0) -=(2.6,0)
+          (2.4,7.15) +=(2.6,0) -=(2.6,0)
+          (17.3,8.15) +=(3.0,0) -=(3.1,0)};
+      \draw[kdorange,dashed,thick] (axis cs:0,0.4) -- (axis cs:0,8.6);
+      \draw[kdgray!40] (axis cs:-26,4.5) -- (axis cs:22,4.5);
+      \legend{seed 2, seed 3}
+    \end{axis}
+  \end{tikzpicture}
+
+  \scriptsize Interval clear of 0 = a real difference on these questions. Not clear of 0:
+  teacher vs untrained (both seeds), human vs untrained (seed 3), teacher vs human (seed 3).
+\end{frame}
+
+% ------------------------------------------------------------- E3
+\begin{frame}{What each arm cost\hfill\ours\ \who{E3}}
+  \begin{columns}[c]
+    \begin{column}{0.56\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[kdaxis,width=7.6cm,height=5.0cm,
+            xbar,bar width=6pt,xmin=0,xmax=4.1,
+            symbolic y coords={hardlabel,human,teacher,onpolicy},ytick=data,
+            yticklabels={hard labels,human text,teacher text,on-policy},
+            xlabel={training time per run (GPU-hours, Kaggle T4 x2)},
+            enlarge y limits=0.2,xmajorgrids,
+            point meta=x,
+            nodes near coords={\pgfmathprintnumber[fixed,precision=2]{\pgfplotspointmeta}},
+            nodes near coords style={font=\tiny,text=kdink},
+            legend style={at={(0.98,0.04)},anchor=south east},legend cell align=left]
+          \addplot[fill=kdteal,draw=kdteal] coordinates
+            {(0.208,hardlabel) (0.281,human) (0.358,teacher) (3.339,onpolicy)};
+          \addplot[fill=kdblue,draw=kdblue] coordinates
+            {(0.219,hardlabel) (0.277,human) (0.339,teacher) (3.007,onpolicy)};
+          \legend{seed 2, seed 3}
+        \end{axis}
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.41\textwidth}
+      \small
+      \begin{itemize}
+        \item Equal \emph{updates}, not equal \emph{compute}: on-policy
+              training took about \textbf{10$\times$} longer.
+        \item Equal updates are not equal tokens either: per run the
+              student saw 190k answer tokens of human text, 521k of
+              teacher text and about 560k of its own.
+        \item Seeds 2 and 3 together: 8.0 GPU-hours of training and
+              6.9 of evaluation (34 to 60 minutes per run).
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Answers got longer, and more were cut off\hfill\ours\ \who{E3}}
+  \centering\footnotesize
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{@{}l rr rr rr@{}}
+    \toprule
+    & \multicolumn{2}{c}{\textbf{Mean tokens}} & \multicolumn{2}{c}{\textbf{Median tokens}} & \multicolumn{2}{c}{\textbf{Cut off at 512 (\%)}} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(l){6-7}
+    \textbf{Arm} & seed 2 & seed 3 & seed 2 & seed 3 & seed 2 & seed 3 \\
+    \midrule
+    \arm{human}          & 259 & 290 & 239 & 270 & 5.9 & 6.8 \\
+    \arm{teacher}        & 268 & 285 & 252 & 268 & 4.1 & 6.4 \\
+    \arm{onpolicy}       & 282 & 304 & 260 & 282 & 8.3 & 10.1 \\
+    \arm{ref\_hardlabel} & 110 & 147 & 83 & 93 & 5.0 & 12.1 \\
+    \midrule
+    \arm{ref\_student0}  & \multicolumn{2}{c}{232} & \multicolumn{2}{c}{217} & \multicolumn{2}{c}{1.7} \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{0.25cm}
+  \begin{itemize}\small
+    \item All distilled students write longer answers than before training, and
+          4 to 12\% of them hit the 512-token cap (1.7\% before).
+    \item Hard labels taught GSM8K's short style (median under 100 tokens), yet
+          5 to 12\% of answers still ran to the cap.
+    \item A cut-off answer is almost always wrong, so the cap costs every arm some
+          accuracy, on-policy the most.
+  \end{itemize}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Is the gain just answer length?\hfill\ours\ \who{E3}}
+  \begin{columns}[c]
+    \begin{column}{0.58\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[kdaxis,width=7.9cm,height=5.4cm,
+            ymin=0,ymax=105,
+            symbolic x coords={a,b,c,d,e},xtick=data,
+            xticklabels={0--128,128--256,256--384,384--512,cut off},
+            xlabel={length of the answer (tokens), seed 3},
+            ylabel={accuracy (\%)},
+            ymajorgrids,legend style={at={(0.02,0.03)},anchor=south west},legend cell align=left]
+          \addplot[kdblue,very thick,mark=*] coordinates
+            {(a,92.9) (b,89.1) (c,71.5) (d,49.7) (e,5.3)};
+          \addplot[kdteal,thick,mark=square*] coordinates
+            {(a,84.0) (b,78.7) (c,59.5) (d,36.2) (e,8.2)};
+          \addplot[kdgray,thick,mark=triangle*] coordinates
+            {(a,100.0) (b,78.2) (c,55.4) (d,36.8) (e,5.6)};
+          \addplot[kdorange,thick,dashed,mark=diamond*] coordinates
+            {(a,71.5) (b,70.6) (c,52.3) (d,22.7) (e,0.0)};
+          \legend{on-policy, teacher text, human text, untrained}
+        \end{axis}
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.39\textwidth}
+      \small
+      \begin{itemize}
+        \item Longer answers are harder for every model.
+        \item But in the two biggest bands, 128 to 384 tokens (about 80\% of
+              questions), on-policy leads in \textbf{both} seeds.
+        \item So the gain is not only ``shorter answers''.
+      \end{itemize}
+      {\tiny\color{kdgray} Band sizes differ per run; the shortest band has only
+      14 to 130 answers. From \texttt{accuracy\_by\_length} in \texttt{kd/stats.py}.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Size, speed and fidelity\hfill\ours\ \who{E3}}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Accuracy vs size and speed (B3 theme)}
+        \footnotesize
+        \renewcommand{\arraystretch}{1.2}
+        \begin{tabular}{@{}lrr@{}}
+          & Qwen3-4B & Qwen3-0.6B \\
+          \midrule
+          Parameters & 4.0 B & 0.6 B \\
+          GPU memory to run (fp16) & 7.7 GB & 1.3 GB \\
+          Time for 300 questions & 730 s & 321 s \\
+          Accuracy, 300 questions & 83.0\% & 56.7\% \\
+          Best distilled, 1,319 qs & & 69.1\% \\
+        \end{tabular}
+
+        \vspace{0.1cm}
+        \scriptsize About 6.7$\times$ fewer parameters and 2.3$\times$ faster
+        (headroom test, one T4, 384 tokens).
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{todobox}{Teacher on the full test set (E2), then agreement (E1)}
+        Run \arm{ref\_teacher} with \repofile{scripts/30\_evaluate.py}. It gives:
+        \begin{itemize}
+          \item teacher accuracy on all 1,319 questions (replaces the 300-question numbers);
+          \item \textbf{agreement}: how often each student's final answer equals the
+                teacher's, overall and on questions the teacher gets wrong
+                (\texttt{agreement()} in \repofile{kd/stats.py});
+          \item the teacher's evaluation time at 512 tokens, for the speed row.
+        \end{itemize}
+      \end{todobox}
+    \end{column}
+  \end{columns}
+\end{frame}

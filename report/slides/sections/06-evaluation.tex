@@ -1,0 +1,78 @@
+% =====================================================================
+% 06-evaluation.tex -- Evaluation method.  E2 2 min (grading), E1 2 min (statistics)
+% Sources: src/kd/answer_extraction.py, src/kd/evaluate.py,
+%          scripts/30_evaluate.py, src/kd/stats.py,
+%          notes/theory/e1-fair-evaluation-statistics.md
+% =====================================================================
+\renewcommand{\sectioninfo}{Presenters: E2 (2 min), E1 (2 min)}
+\section{Evaluation method}
+
+% ------------------------------------------------------------- E2
+\begin{frame}[fragile]{Grading an answer\hfill\who{E2}}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+\begin{lstlisting}
+def extract_last_number(text):
+    """The model's answer: the last number it wrote."""
+    cleaned = text.replace(",", "").replace("$", "")
+    numbers = re.findall(r"-?\d+(?:\.\d+)?", cleaned)
+    return float(numbers[-1]) if numbers else None
+
+# correct if it equals the gold answer after "####"
+is_correct = (predicted is not None
+              and abs(predicted - expected) < 1e-6)
+\end{lstlisting}
+      {\tiny\color{kdgray} From \texttt{src/kd/answer\_extraction.py} and \texttt{src/kd/evaluate.py} (shortened)}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \footnotesize
+      \begin{itemize}
+        \item All \textbf{1,319} GSM8K test questions, the same prompt for
+              every model, thinking mode off.
+        \item \textbf{Greedy} decoding, batched, at most \textbf{512} new
+              tokens; an answer without an end token is flagged as cut off.
+        \item One file per run: \repofile{predictions.jsonl}, one line per
+              question.
+      \end{itemize}
+      \begin{block}{Example}
+        \scriptsize
+        Model: ``\dots she makes \$18 every day.'' $\rightarrow$ 18.0\\
+        Gold: ``\dots\ \#\#\#\# 18'' $\rightarrow$ 18.0 \quad \textcolor{kdteal}{\textbf{correct}}
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------- E1
+\begin{frame}{Error bars and fair comparisons\hfill\est\ \who{E1}}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \small
+      \textbf{One accuracy}: a 95\% Wilson interval for $k$ correct out of
+      $n$, with $p = k/n$ and $z = 1.96$:
+      \[
+        \frac{p + \frac{z^2}{2n} \pm z\sqrt{\frac{p(1-p)}{n} + \frac{z^2}{4n^2}}}{1 + \frac{z^2}{n}}
+      \]
+      It stays inside $[0,1]$ and behaves near 0\% and 100\%
+      \src{Wilson, 1927; Brown et al., 2001}.
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \small
+      \uncover<2->{\textbf{Two runs}: they answered the \emph{same} questions,
+      so compare question by question:
+      \[ d = \tfrac{1}{n}\textstyle\sum_i (a_i - b_i), \quad a_i, b_i \in \{0,1\} \]
+      Resample the questions 10,000 times (seed 42) and take the 2.5\% and
+      97.5\% points of $d$: the paired bootstrap interval
+      \src{Miller, 2024; Efron and Tibshirani, 1993}.}
+    \end{column}
+  \end{columns}
+  \vspace{0.2cm}
+  \begin{uncoverenv}<3->
+  \begin{keybox}
+    \footnotesize \textbf{Rules we follow.} The bootstrap covers the choice of test
+    questions, not training noise, so every seed is shown separately with its
+    mean and range. We never pick the best seed. A difference whose interval
+    contains 0 is ``no detectable difference''.
+  \end{keybox}
+  \end{uncoverenv}
+\end{frame}

@@ -1,0 +1,113 @@
+% =====================================================================
+% 00-opening.tex -- title, draft status, roadmap.  Owner: T3
+% =====================================================================
+
+% ---------------------------------------------------------------- title
+\begin{frame}[plain,noframenumbering]
+  \begin{tikzpicture}[remember picture,overlay]
+    \fill[kdpale] (current page.south west) rectangle ([yshift=1.0cm]current page.south east);
+    \fill[kdblue] (current page.north west) rectangle ([xshift=0.22cm]current page.south west);
+    \node[anchor=south west,font=\scriptsize,text=kdnavy]
+      at ([xshift=0.8cm,yshift=0.38cm]current page.south west) {\insertinstitute};
+  \end{tikzpicture}%
+  \begin{columns}[c]
+    \begin{column}{0.53\textwidth}
+      {\color{kdnavy}\LARGE\bfseries \inserttitle\par}
+      \vspace{0.35cm}
+      {\color{kdblue}\large \insertsubtitle\par}
+      \vspace{0.6cm}
+      {\small \insertauthor\par}
+      \vspace{0.15cm}
+      {\small\color{kdgray} \insertdate\par}
+      \vspace{0.9cm}
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \centering
+      \begin{tikzpicture}[font=\scriptsize]
+        % teacher with its next-token distribution
+        \node[draw=kdnavy,line width=0.8pt,fill=white,rounded corners=4pt,
+              minimum width=3.6cm,minimum height=1.7cm] (T) at (0,2.0) {};
+        \node[anchor=north,font=\scriptsize\bfseries,text=kdnavy] at (T.north) {Teacher: Qwen3-4B};
+        \foreach \i/\h in {0/0.20,1/0.62,2/0.34,3/0.12,4/0.44,5/0.07}
+          \fill[kdblue] (-1.2+\i*0.44,1.35) rectangle ++(0.30,\h);
+        % student, a smaller copy of the distribution
+        \node[draw=kdteal,line width=0.8pt,fill=white,rounded corners=4pt,
+              minimum width=2.6cm,minimum height=1.3cm] (S) at (0,-0.55) {};
+        \node[anchor=north,font=\scriptsize\bfseries,text=kdteal] at (S.north) {Student: Qwen3-0.6B};
+        \foreach \i/\h in {0/0.14,1/0.40,2/0.26,3/0.10,4/0.30,5/0.06}
+          \fill[kdteal] (-0.85+\i*0.31,-1.05) rectangle ++(0.21,\h);
+        % the distillation signal
+        \draw[-{Stealth[length=2.4mm]},very thick,kdorange] (T.south) -- (S.north)
+          node[midway,right,align=left,text=kdink,font=\tiny] {full next-token\\distribution};
+        % three possible sources of training text
+        \node[draw=kdgray,rounded corners=2pt,fill=kdlight,font=\tiny,minimum width=1.25cm] (h) at (-2.75,1.05) {human text};
+        \node[draw=kdgray,rounded corners=2pt,fill=kdlight,font=\tiny,minimum width=1.25cm] (t) at (-2.75,0.45) {teacher text};
+        \node[draw=kdgray,rounded corners=2pt,fill=kdlight,font=\tiny,minimum width=1.25cm] (o) at (-2.75,-0.15) {own text};
+        \foreach \n in {h,t,o}
+          \draw[-{Stealth[length=1.6mm]},kdgray] (\n.east) to[out=0,in=180] (S.west);
+        \node[font=\tiny\itshape,text=kdgray] at (-2.75,1.55) {which text?};
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------- draft status (delete)
+\begin{frame}{Draft status: delete this slide before the talk\hfill\who{T3}}
+  \footnotesize
+  Built from the repository on Nov 25 (\repofile{main}, commit 0423e89).
+  Every number comes from \repofile{results/} via \repofile{src/kd/stats.py}.
+  \vspace{0.15cm}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Available and used in this deck}
+        \begin{itemize}\setlength{\itemsep}{1pt}
+          \item Seeds 2 and 3: all four arms, trained and evaluated
+          \item Untrained student on all 1,319 test questions
+          \item Headroom test (300 questions) and teacher answers cache
+          \item Pilots and the learning-rate sweep
+          \item Fairness check: seeds 2 and 3 pass
+          \item Code: data, losses, training, evaluation, statistics
+        \end{itemize}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{alertblock}{Missing: marked with orange boxes}
+        \begin{itemize}\setlength{\itemsep}{1pt}
+          \item Seed 1 runs (T1): not on GitHub yet
+          \item \arm{ref\_teacher} on the full test set (E2): teacher
+                accuracy, agreement, speed
+          \item Figure script \repofile{40\_make\_figures.py} (E3): charts
+                here are typed in from \repofile{kd.stats}
+          \item Theory notes of T1, T2, T3, E2, E3: slides drafted from
+                our source notes, owners to check
+          \item Interpretation meeting outcome; team names
+        \end{itemize}
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------ roadmap
+\begin{frame}{Roadmap: one lecture, six speakers\hfill\who{T3}}
+  \centering\small
+  \begin{tabular}{@{}r l l r@{}}
+    \toprule
+    & Part & Presenter & Minutes \\
+    \midrule
+    1 & Motivation and research question & T3 & 6 \\
+    2 & Distillation basics: soft targets and temperature & T2 & 8 \\
+    3 & KL directions, on-policy training, exposure bias & T1 & 6 \\
+    4 & What the literature establishes & E2 & 8 \\
+    5 & Experiment design and pipeline & T3, T2, T1 & 10 \\
+    6 & Evaluation method & E2, E1 & 4 \\
+    7 & Results & E1, E3 & 10 \\
+    8 & Interpretation and limitations & E1, E3 & 5 \\
+    9 & Conclusion and reproducibility & E3 & 3 \\
+    \midrule
+      & \textbf{Total} & & \textbf{60} \\
+    \bottomrule
+  \end{tabular}
+
+  \vspace{0.25cm}
+  {\scriptsize\color{kdgray} Labels on the slides:\ \est\ from the literature \quad \ours\ from our own runs}
+\end{frame}
