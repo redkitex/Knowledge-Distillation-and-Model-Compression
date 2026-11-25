@@ -1,0 +1,26 @@
+{
+  "run_id": "human_s1",
+  "arm": "human",
+  "seed": 1,
+  "account": "T1",
+  "started_utc": "2026-11-24T13:30:27Z",
+  "git_commit": "86a02e9ad3846c031ec792f84eec7a249d03e763",
+  "config_path": "configs/default.yaml",
+  "config_hash": "85bee6cac023",
+  "max_steps": null,
+  "mixed_lambda": null,
+  "status": "trained",
+  "ended_utc": "2026-11-24T13:46:50Z",
+  "gpu_hours": 0.273,
+  "summary": {
+    "steps": 500,
+    "final_loss_mean_last_10": 0.25171,
+    "tokens": 189765,
+    "oom_retries": 0,
+    "unfinished_sequences": 0,
+    "truncated_sequences": 0,
+    "train_seconds": 894.3,
+    "mixed_lambda": null,
+    "vocab_sliced_to": null
+  }
+}

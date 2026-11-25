@@ -1,0 +1,9 @@
+{
+  "model": "results/runs/onpolicy_s1/checkpoint",
+  "n": 1319,
+  "correct": 863,
+  "accuracy": 0.6543,
+  "mean_response_tokens": 272.5,
+  "truncated_fraction": 0.0652,
+  "elapsed_seconds": 3386.8
+}

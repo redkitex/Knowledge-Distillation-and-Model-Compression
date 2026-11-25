@@ -1,0 +1,26 @@
+{
+  "run_id": "onpolicy_s1",
+  "arm": "onpolicy",
+  "seed": 1,
+  "account": "T1",
+  "started_utc": "2026-11-24T14:19:21Z",
+  "git_commit": "86a02e9ad3846c031ec792f84eec7a249d03e763+dirty",
+  "config_path": "configs/default.yaml",
+  "config_hash": "85bee6cac023",
+  "max_steps": null,
+  "mixed_lambda": null,
+  "status": "trained",
+  "ended_utc": "2026-11-24T17:19:35Z",
+  "gpu_hours": 3.004,
+  "summary": {
+    "steps": 500,
+    "final_loss_mean_last_10": 0.163008,
+    "tokens": 560319,
+    "oom_retries": 0,
+    "unfinished_sequences": 138,
+    "truncated_sequences": 0,
+    "train_seconds": 10790.3,
+    "mixed_lambda": null,
+    "vocab_sliced_to": null
+  }
+}

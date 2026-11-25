@@ -1,0 +1,9 @@
+{
+  "model": "results/runs/teacher_s1/checkpoint",
+  "n": 1319,
+  "correct": 838,
+  "accuracy": 0.6353,
+  "mean_response_tokens": 284.4,
+  "truncated_fraction": 0.0857,
+  "elapsed_seconds": 3404.5
+}
