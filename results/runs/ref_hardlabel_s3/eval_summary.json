@@ -1,0 +1,9 @@
+{
+  "model": "results/runs/ref_hardlabel_s3/checkpoint",
+  "n": 1319,
+  "correct": 565,
+  "accuracy": 0.4284,
+  "mean_response_tokens": 146.9,
+  "truncated_fraction": 0.1205,
+  "elapsed_seconds": 2787.0
+}

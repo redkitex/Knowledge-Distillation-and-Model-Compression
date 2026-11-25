@@ -1,0 +1,9 @@
+{
+  "model": "results/runs/human_s3/checkpoint",
+  "n": 1319,
+  "correct": 793,
+  "accuracy": 0.6012,
+  "mean_response_tokens": 289.7,
+  "truncated_fraction": 0.0682,
+  "elapsed_seconds": 3424.4
+}
