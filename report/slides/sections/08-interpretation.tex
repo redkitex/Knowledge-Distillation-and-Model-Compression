@@ -34,6 +34,31 @@
   \end{uncoverenv}
 \end{frame}
 
+% ------------------------------------------------------------------
+\begin{frame}{Why are the gains small?\hfill\who{E1}}
+  \small
+  \begin{enumerate}
+    \item<1-> \textbf{The student was already distilled.} \est\ Qwen3-0.6B was made by
+          distilling larger Qwen3 models, first off-policy, then on-policy
+          \src{Qwen Team, 2025}. Copying fixed text from the same family leaves
+          little to learn; only training on its own mistakes still found something.
+    \item<2-> \textbf{Short training.} \ours\ 2,000 questions and 500 updates per arm, on
+          free Kaggle GPUs: far from the scale of the industrial recipes.
+    \item<3-> \textbf{Human text has a different style.} \ours\ GSM8K solutions are short
+          and terse. Even with the teacher's soft targets, training on them lowered
+          accuracy in two seeds out of three.
+  \end{enumerate}
+  \vspace{0.2cm}
+  \begin{uncoverenv}<4->
+  \begin{keybox}
+    \footnotesize \textbf{Small, but consistent.} The order on-policy $>$ teacher text $>$
+    human text $>$ hard labels is the same in all three seeds, and on-policy beats the
+    untrained student in every one. The comparison between arms is the result, not the
+    absolute gain.
+  \end{keybox}
+  \end{uncoverenv}
+\end{frame}
+
 % ------------------------------------------------------------- E3
 \begin{frame}{Limitations and alternative explanations\hfill\who{E3}}
   \begin{columns}[T]
