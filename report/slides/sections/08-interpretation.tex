@@ -1,39 +1,36 @@
 % =====================================================================
 % 08-interpretation.tex -- Interpretation and limitations.
 % E1 2 min (what the results show), E3 3 min (limitations and
-% alternative explanations). DRAFT: based on seeds 2 and 3 only; update
-% after seed 1 and the interpretation meeting.
+% alternative explanations). Numbers: three seeds and ref_teacher,
+% from results/tables/ (python -m kd.stats --tables).
 % =====================================================================
 \renewcommand{\sectioninfo}{Presenters: E1 (2 min), E3 (3 min)}
 \section{Interpretation and limitations}
 
 % ------------------------------------------------------------- E1
-\begin{frame}{What the results show (draft, two seeds)\hfill\ours\ \who{E1}}
+\begin{frame}{What the results show\hfill\ours\ \who{E1}}
   \small
   \begin{enumerate}
-    \item<1-> \textbf{The source of the text matters.} With the same target and the same
-          500 updates, the student's own text gave \textbf{+6.3 and +7.1 points} over the
-          untrained student and +6.7 to +11.5 over the other two sources; every one of these
-          intervals excludes 0.
-    \item<2-> \textbf{Off-policy text did not help here.} Teacher text: $-1.8$ and $+0.5$
-          (not significant); human text: $-5.2$ (significant) and $-1.9$ (not).
-          The already tuned student had little to gain from imitating fixed text.
-    \item<3-> \textbf{Soft targets matter.} On the same human text, matching the teacher's
-          distribution beat hard labels by \textbf{+15.6 and +17.3 points}: the classic
-          B3 result, reproduced at this scale.
+    \item<1-> \textbf{Learning on its own text helped; copying fixed text did not.}
+          With the same target and the same 500 updates, on-policy beat the untrained
+          student in every seed ($+3.4$ to $+7.1$ points). Teacher text made no detectable
+          difference in any seed, and human text was lower in two of three.
+    \item<2-> \textbf{The lead over teacher text is real but not large.} $+5.6$ points on
+          average, significant in two seeds out of three; in seed 1 the interval
+          includes 0.
+    \item<3-> \textbf{Soft targets matter most.} On the same human text, the teacher's full
+          distribution beat hard labels by $+15.6$ to $+17.3$ points in every seed. With hard
+          labels the student copies GSM8K's short style (median answer under 100 tokens) and
+          reasons worse.
   \end{enumerate}
   \vspace{0.15cm}
   \begin{uncoverenv}<4->
   \begin{keybox}
     \footnotesize This pattern \emph{fits} the exposure-bias explanation: only the arm that
-    learns on its own prefixes improves. It does not \emph{prove} it; the next slide
-    lists what else could produce the same numbers.
+    learns on its own prefixes improves. It does not \emph{prove} it, and the student is
+    still 21 to 25 points below the teacher. The next slide lists what else could produce
+    the same numbers.
   \end{keybox}
-  \end{uncoverenv}
-  \begin{uncoverenv}<4->
-  \begin{todobox}{Final wording after seed 1 and the interpretation meeting (E1)}
-    Check that seed 1 shows the same pattern; then fix the wording here and in the note.
-  \end{todobox}
   \end{uncoverenv}
 \end{frame}
 

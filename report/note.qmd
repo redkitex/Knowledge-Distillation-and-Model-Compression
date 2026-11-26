@@ -62,17 +62,27 @@ How to use this file (E1 assembles it, everyone writes their own section).
 
 # Results
 
-<!-- Writers: E1 (accuracy per arm, paired differences, seeds), E3 (length, truncation, agreement, size and speed) · about 0.75 pages. Numbers only from results/tables/. -->
+<!-- Writers: E1 (accuracy per arm, paired differences, seeds, agreement), E3 (length, truncation, cost, size and speed) · about 0.75 pages. Numbers only from results/tables/ (python -m kd.stats --tables results/tables). -->
 
-*TODO after the "Results in" check (Nov 24): table of accuracy per arm and seed with CIs; figure of paired differences; length and truncation per arm.*
+{{< include ../results/tables/note_table.md >}}
+
+@tbl-accuracy shows the accuracy of every arm and seed on the 1,319 test questions. Before training, the student answers 62.0% correctly and the teacher 90.3%, a gap of 28.3 points. On-policy distillation is the only arm that improves on the untrained student in all three seeds: it reaches 65.4, 68.3 and 69.1%, and the paired differences of +3.4, +6.3 and +7.1 points all have intervals that exclude zero. Training on teacher-written answers leaves the student where it started (−1.8 to +1.5 points, not significant in any seed). Training on the human solutions lowers accuracy in two seeds (−5.8 and −5.2 points); in the third the difference of −1.9 is not significant.
+
+Compared directly, on-policy text beats teacher text by 5.6 points on average (+1.9, +8.1 and +6.7). The difference is significant in seeds 2 and 3, but not in seed 1, where the interval is [−0.6, +4.4]. The largest effect in the experiment concerns the target rather than the text. On the same human solutions, matching the teacher's full distribution instead of the one-hot label gives +15.6 to +17.3 points, and the hard-label student ends about 20 points below the untrained one. The same arm moves by 2.7 to 3.9 points from one seed to another, more than half the width of a single interval, which is why we report every seed instead of an average alone.
+
+The teacher's answers also tell us how far each student moved towards it. On-policy students give the same final number as the teacher on 65.0 to 68.8% of the questions, against 61.0% before training. On the 128 questions the teacher gets wrong, they repeat its wrong answer 17 to 23% of the time, against 11% before training and 13 to 18% for the other soft-target arms.
+
+<!-- E3: answer length, truncation, training cost, size and speed go here. -->
 
 # Interpretation
 
-<!-- Writer: E1, from the interpretation meeting on Nov 25 · about 0.4 pages -->
+<!-- Writer: E1 · about 0.4 pages. Agreed reading from the interpretation meeting on Nov 25. -->
 
-*TODO (E1): what the results show and what they do not. Say plainly when a difference is not significant, and discuss answer length as an alternative explanation.*
+At an equal number of updates and with the same target, the source of the training sequences mattered: only the student's own text improved it. This fits the exposure-bias argument for on-policy distillation [@agarwal2024gkd]. An off-policy student is trained on prefixes it would not have written itself, whereas an on-policy student is corrected on the prefixes it actually produces at test time. Teacher-written text, the recipe behind the small DeepSeek-R1 models [@deepseek2025r1], gave no measurable gain at our scale, which is in line with Qwen3 adding an on-policy stage after off-policy distillation [@qwen2025qwen3]. The agreement numbers point the same way: the on-policy students did not only answer more questions correctly, they also became more like the teacher, including some of its mistakes. Fidelity and accuracy are different things [@stanton2021does], and here both went up.
 
-# Limitations
+We do not claim more than this. The lead of on-policy over teacher text is significant in two seeds out of three. The learning rate was tuned on the on-policy arm and on the test set, and each on-policy update cost about ten times more compute than an off-policy one; both could account for part of the difference (@sec-limitations). The clearest result is about the target, not the text: with identical sequences, the teacher's soft targets beat hard labels by about 16 points, the effect described by @hinton2015distilling. The hard-label student also adopted the short style of the GSM8K solutions, so part of that gap may come from shorter reasoning and not only from the missing information in the non-argmax probabilities.
+
+# Limitations {#sec-limitations}
 
 <!-- Writer: E3 · about 0.25 pages -->
 

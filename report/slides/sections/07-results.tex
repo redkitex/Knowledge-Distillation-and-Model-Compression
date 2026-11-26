@@ -2,62 +2,62 @@
 % 07-results.tex -- Results.  E1 6 min (accuracy, seeds, differences),
 % E3 4 min (cost, length, size and speed)
 %
-% Numbers: python -m kd.stats (src/kd/stats.py, E1) on results/runs/,
-% seeds 2 and 3 plus ref_student0, computed on Nov 25.
-% When seed 1 and ref_teacher arrive: rerun kd.stats and update the
-% coordinates below (or replace the charts with the PNGs from
-% scripts/40_make_figures.py once E3 has written it).
+% Numbers: python -m kd.stats --tables results/tables (src/kd/stats.py, E1)
+% on results/runs/: three seeds, ref_student0 and ref_teacher (Nov 26).
+% E1 frames updated; E3 frames below still show seeds 2 and 3 only.
 % =====================================================================
 \renewcommand{\sectioninfo}{Presenters: E1 (6 min), E3 (4 min)}
 \section{Results}
 
 % ------------------------------------------------------------- E1
-\begin{frame}{On-policy text beats every other source\hfill\ours\ \who{E1}}
+\begin{frame}{On-policy text is the best source on average\hfill\ours\ \who{E1}}
   \begin{columns}[c]
     \begin{column}{0.6\textwidth}
       \centering
       \begin{tikzpicture}
         \begin{axis}[kdaxis,width=8.2cm,height=5.6cm,
-            ybar,bar width=11pt,ymin=30,ymax=80,
+            ybar,bar width=7pt,ymin=30,ymax=80,
             symbolic x coords={human,teacher,onpolicy,hardlabel},xtick=data,
             xticklabels={human text,teacher text,on-policy,hard labels},
             ylabel={accuracy on 1,319 test questions (\%)},
             enlarge x limits=0.16,ymajorgrids,
             legend style={at={(0.02,0.98)},anchor=north west},legend cell align=left]
+          \addplot[fill=kdnavy,draw=kdnavy,
+              error bars/.cd,y dir=both,y explicit,error bar style={kdink}]
+            coordinates {(human,56.2) +=(0,2.7) -=(0,2.7)
+                         (teacher,63.5) +=(0,2.6) -=(0,2.6)
+                         (onpolicy,65.4) +=(0,2.5) -=(0,2.6)
+                         (hardlabel,40.1) +=(0,2.7) -=(0,2.6)};
           \addplot[fill=kdteal,draw=kdteal,
               error bars/.cd,y dir=both,y explicit,error bar style={kdink}]
             coordinates {(human,56.8) +=(0,2.6) -=(0,2.7)
                          (teacher,60.2) +=(0,2.6) -=(0,2.7)
                          (onpolicy,68.3) +=(0,2.5) -=(0,2.6)
-                         (hardlabel,41.2) +=(0,2.6) -=(0,2.7)};
+                         (hardlabel,41.2) +=(0,2.7) -=(0,2.6)};
           \addplot[fill=kdblue,draw=kdblue,
               error bars/.cd,y dir=both,y explicit,error bar style={kdink}]
-            coordinates {(human,60.1) +=(0,2.6) -=(0,2.6)
-                         (teacher,62.5) +=(0,2.5) -=(0,2.7)
-                         (onpolicy,69.1) +=(0,2.5) -=(0,2.5)
+            coordinates {(human,60.1) +=(0,2.6) -=(0,2.7)
+                         (teacher,62.5) +=(0,2.6) -=(0,2.6)
+                         (onpolicy,69.1) +=(0,2.4) -=(0,2.5)
                          (hardlabel,42.8) +=(0,2.7) -=(0,2.6)};
           \draw[kdorange,thick,dashed] (rel axis cs:0,0.64) -- (rel axis cs:1,0.64);
           \node[font=\tiny,text=kdorange,anchor=south east] at (rel axis cs:1,0.64) {untrained student 62.0};
-          \legend{seed 2, seed 3}
+          \legend{seed 1, seed 2, seed 3}
         \end{axis}
       \end{tikzpicture}
 
-      {\tiny\color{kdgray} Bars: accuracy; whiskers: 95\% Wilson intervals. Seed 1 not yet available.}
+      {\tiny\color{kdgray} Bars: accuracy; whiskers: 95\% Wilson intervals.
+      The teacher (90.3\%) is off the top of the chart.}
     \end{column}
     \begin{column}{0.37\textwidth}
       \small
       \begin{itemize}
-        \item<1-> \arm{onpolicy}: 68.3\% and 69.1\%, about \textbf{7 points above}
-              the untrained student.
-        \item<2-> Teacher and human text: \textbf{no gain}, around or below
-              the untrained student.
-        \item<3-> Hard labels on the same human text: \textbf{about 20 points
-              lower}.
+        \item<1-> \arm{onpolicy}: 65.4, 68.3 and 69.1\%. The \textbf{only} arm above
+              the untrained student in every seed.
+        \item<2-> Teacher text: around the untrained student. Human text:
+              \textbf{below} it in two seeds out of three.
+        \item<3-> Hard labels on the same human text: \textbf{about 20 points lower}.
       \end{itemize}
-      \begin{todobox}{Seed 1 (T1)}
-        Add \arm{human\_s1}, \arm{teacher\_s1}, \arm{onpolicy\_s1},
-        \arm{ref\_hardlabel\_s1} as a third bar per arm once pushed.
-      \end{todobox}
     \end{column}
   \end{columns}
 \end{frame}
@@ -66,30 +66,25 @@
 \begin{frame}{Every arm and seed, with intervals\hfill\ours\ \who{E1}}
   \centering\footnotesize
   \renewcommand{\arraystretch}{1.25}
-  \begin{tabular}{@{}l c c c r@{}}
+  \begin{tabular}{@{}l c c c c@{}}
     \toprule
-    \textbf{Arm} & \textbf{Seed 1} & \textbf{Seed 2} & \textbf{Seed 3} & \textbf{Mean} \\
+    \textbf{Arm} & \textbf{Seed 1} & \textbf{Seed 2} & \textbf{Seed 3} & \textbf{Mean (range)} \\
     \midrule
-    \arm{human}         & \textcolor{kdorange}{missing} & 56.8 \;[54.1, 59.4] & 60.1 \;[57.5, 62.7] & 58.5 \\
-    \arm{teacher}       & \textcolor{kdorange}{missing} & 60.2 \;[57.5, 62.8] & 62.5 \;[59.8, 65.0] & 61.3 \\
-    \arm{onpolicy}      & \textcolor{kdorange}{missing} & \textbf{68.3} \;[65.7, 70.8] & \textbf{69.1} \;[66.6, 71.6] & \textbf{68.7} \\
-    \arm{ref\_hardlabel} & \textcolor{kdorange}{missing} & 41.2 \;[38.5, 43.8] & 42.8 \;[40.2, 45.5] & 42.0 \\
+    \arm{human}          & 56.2 \;[53.5, 58.8] & 56.8 \;[54.1, 59.4] & 60.1 \;[57.5, 62.7] & 57.7 \;(56.2--60.1) \\
+    \arm{teacher}        & 63.5 \;[60.9, 66.1] & 60.2 \;[57.5, 62.8] & 62.5 \;[59.8, 65.0] & 62.1 \;(60.2--63.5) \\
+    \arm{onpolicy}       & \textbf{65.4} \;[62.8, 67.9] & \textbf{68.3} \;[65.7, 70.8] & \textbf{69.1} \;[66.6, 71.6] & \textbf{67.6} \;(65.4--69.1) \\
+    \arm{ref\_hardlabel} & 40.1 \;[37.5, 42.8] & 41.2 \;[38.5, 43.8] & 42.8 \;[40.2, 45.5] & 41.4 \;(40.1--42.8) \\
     \midrule
-    \arm{ref\_student0} & \multicolumn{3}{c}{62.0 \;[59.4, 64.6] \quad untrained student} & \\
-    \arm{ref\_teacher} & \multicolumn{3}{c}{\textcolor{kdorange}{Qwen3-4B: not evaluated on all 1,319 questions yet}} & \\
+    \arm{ref\_student0}  & \multicolumn{3}{c}{untrained student, no training} & 62.0 \;[59.4, 64.6] \\
+    \arm{ref\_teacher}   & \multicolumn{3}{c}{Qwen3-4B teacher, no training}  & 90.3 \;[88.6, 91.8] \\
     \bottomrule
   \end{tabular}
 
-  \vspace{0.2cm}
-  {\scriptsize Accuracy in \%, all 1,319 test questions, 95\% Wilson intervals in brackets;
-  mean over the two seeds available.
-  Seed-to-seed spread: 0.8 (on-policy) to 3.3 points (human).}
-  \vspace{0.15cm}
+  \vspace{0.3cm}
+  {\scriptsize Accuracy in \%, all 1,319 test questions, 95\% Wilson intervals in brackets.
+  From \repofile{results/tables/results.md},
+  made by \texttt{python -m kd.stats -{}-tables}.}
 
-  \begin{todobox}{Seed 1 column and the three-seed mean (T1, then E1)}
-    Fill the seed 1 column from \repofile{python -m kd.stats} and change the last column
-    to the mean and range of three seeds.
-  \end{todobox}
 \end{frame}
 
 % ------------------------------------------------------------------
@@ -104,37 +99,181 @@
                      teacher $-$ human, human $-$ hard labels},
         xlabel={difference in accuracy (percentage points), 95\% paired bootstrap interval},
         xmajorgrids,
-        legend style={at={(0.99,0.03)},anchor=south east},legend cell align=left]
+        legend style={at={(0.01,0.03)},anchor=south west},legend cell align=left]
+      \addplot[only marks,mark=triangle*,mark size=2pt,color=kdnavy,
+          error bars/.cd,x dir=both,x explicit,error bar style={kdnavy,thick}]
+        coordinates {
+          (3.4,0.75) +=(2.4,0) -=(2.4,0)
+          (1.5,1.75) +=(2.5,0) -=(2.6,0)
+          (-5.8,2.75) +=(2.7,0) -=(2.7,0)
+          (-21.9,3.75) +=(3.0,0) -=(3.0,0)
+          (1.9,4.75) +=(2.5,0) -=(2.5,0)
+          (9.2,5.75) +=(2.7,0) -=(2.7,0)
+          (7.4,6.75) +=(2.8,0) -=(2.9,0)
+          (16.1,7.75) +=(3.1,0) -=(3.2,0)};
       \addplot[only marks,mark=*,mark size=1.8pt,color=kdteal,
           error bars/.cd,x dir=both,x explicit,error bar style={kdteal,thick}]
         coordinates {
-          (6.3,0.85) +=(2.4,0) -=(2.4,0)
-          (-1.8,1.85) +=(2.5,0) -=(2.7,0)
-          (-5.2,2.85) +=(2.6,0) -=(2.8,0)
-          (-20.8,3.85) +=(2.9,0) -=(3.1,0)
-          (8.1,4.85) +=(2.4,0) -=(2.4,0)
-          (11.5,5.85) +=(2.6,0) -=(2.6,0)
-          (3.4,6.85) +=(2.8,0) -=(2.8,0)
-          (15.6,7.85) +=(3.1,0) -=(3.1,0)};
+          (6.3,1.00) +=(2.4,0) -=(2.4,0)
+          (-1.8,2.00) +=(2.5,0) -=(2.7,0)
+          (-5.2,3.00) +=(2.7,0) -=(2.7,0)
+          (-20.8,4.00) +=(3.0,0) -=(3.0,0)
+          (8.1,5.00) +=(2.4,0) -=(2.4,0)
+          (11.5,6.00) +=(2.6,0) -=(2.6,0)
+          (3.4,7.00) +=(2.8,0) -=(2.8,0)
+          (15.6,8.00) +=(3.0,0) -=(3.1,0)};
       \addplot[only marks,mark=square*,mark size=1.7pt,color=kdblue,
           error bars/.cd,x dir=both,x explicit,error bar style={kdblue,thick}]
         coordinates {
-          (7.1,1.15) +=(2.5,0) -=(2.5,0)
-          (0.5,2.15) +=(2.5,0) -=(2.6,0)
-          (-1.9,3.15) +=(2.6,0) -=(2.6,0)
-          (-19.2,4.15) +=(3.1,0) -=(3.0,0)
-          (6.7,5.15) +=(2.5,0) -=(2.5,0)
-          (9.0,6.15) +=(2.7,0) -=(2.6,0)
-          (2.4,7.15) +=(2.6,0) -=(2.6,0)
-          (17.3,8.15) +=(3.0,0) -=(3.1,0)};
+          (7.1,1.25) +=(2.4,0) -=(2.5,0)
+          (0.5,2.25) +=(2.6,0) -=(2.6,0)
+          (-1.9,3.25) +=(2.6,0) -=(2.7,0)
+          (-19.2,4.25) +=(3.0,0) -=(3.0,0)
+          (6.7,5.25) +=(2.6,0) -=(2.5,0)
+          (9.0,6.25) +=(2.7,0) -=(2.7,0)
+          (2.4,7.25) +=(2.7,0) -=(2.6,0)
+          (17.3,8.25) +=(3.0,0) -=(3.1,0)};
       \draw[kdorange,dashed,thick] (axis cs:0,0.4) -- (axis cs:0,8.6);
       \draw[kdgray!40] (axis cs:-26,4.5) -- (axis cs:22,4.5);
-      \legend{seed 2, seed 3}
+      \legend{seed 1, seed 2, seed 3}
     \end{axis}
   \end{tikzpicture}
 
-  \scriptsize Interval clear of 0 = a real difference on these questions. Not clear of 0:
-  teacher vs untrained (both seeds), human vs untrained (seed 3), teacher vs human (seed 3).
+  \scriptsize Interval clear of 0 = a real difference on these questions.
+  \textbf{All 3 seeds}: on-policy over untrained and over human, hard labels below untrained,
+  human over hard labels. \textbf{2 of 3}: on-policy over teacher (seed 1: $+1.9$ [$-0.6$, $+4.4$]).
+  \textbf{0 of 3}: teacher vs untrained.
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{One seed alone could tell a different story\hfill\ours\ \who{E1}}
+  \begin{columns}[c]
+    \begin{column}{0.55\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[kdaxis,width=7.2cm,height=4.6cm,
+            xmin=-2,xmax=12,ymin=0.4,ymax=4.6,y dir=reverse,
+            ytick={1,2,3,4},yticklabels={seed 1, seed 2, seed 3, mean},
+            xlabel={on-policy $-$ teacher text (points), 95\% paired interval},
+            xmajorgrids]
+          \addplot[only marks,mark=*,mark size=2pt,color=kdteal,
+              error bars/.cd,x dir=both,x explicit,error bar style={kdteal,thick}]
+            coordinates {(1.9,1) +=(2.5,0) -=(2.5,0)
+                         (8.1,2) +=(2.4,0) -=(2.4,0)
+                         (6.7,3) +=(2.6,0) -=(2.5,0)};
+          \addplot[only marks,mark=diamond*,mark size=3pt,color=kdnavy,
+              error bars/.cd,x dir=both,x explicit,error bar style={kdnavy,thick,dashed}]
+            coordinates {(5.6,4) +=(2.5,0) -=(3.7,0)};
+          \draw[kdorange,dashed,thick] (axis cs:0,0.4) -- (axis cs:0,4.6);
+        \end{axis}
+      \end{tikzpicture}
+
+      {\tiny\color{kdgray} Mean of the three seeds; its bar shows the range of the seeds, not an interval.}
+    \end{column}
+    \begin{column}{0.42\textwidth}
+      \small
+      \begin{itemize}
+        \item<1-> \textbf{Seed 1 only}: $+1.9$ $[-0.6, +4.4]$.
+              ``No detectable difference.''
+        \item<2-> \textbf{Seed 2 or 3 only}: $+8.1$ or $+6.7$.
+              ``A clear win for on-policy.''
+        \item<3-> \textbf{All three}: ahead by 5.6 points on average,
+              significant in two of three seeds.
+      \end{itemize}
+      \begin{uncoverenv}<4->
+      \begin{keybox}
+        \footnotesize The intervals cover the test questions, not training noise.
+        The same arm moves by 2.7 to 3.9 points between seeds, so we show all
+        seeds and never pick the best one \src{Miller, 2024}.
+      \end{keybox}
+      \end{uncoverenv}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Soft targets beat hard labels by 16 points\hfill\ours\ \who{E1}}
+  \begin{columns}[T]
+    \begin{column}{0.45\textwidth}
+      \centering
+      \begin{tikzpicture}
+        \begin{axis}[kdaxis,width=6.4cm,height=4.8cm,
+            ybar,bar width=9pt,ymin=30,ymax=75,
+            symbolic x coords={s1,s2,s3},xtick=data,
+            xticklabels={seed 1,seed 2,seed 3},
+            ylabel={accuracy (\%)},enlarge x limits=0.25,ymajorgrids,
+            legend style={at={(0.5,0.98)},anchor=north,legend columns=2,font=\tiny},legend cell align=left]
+          \addplot[fill=kdteal,draw=kdteal] coordinates {(s1,56.2) (s2,56.8) (s3,60.1)};
+          \addplot[fill=kdorange,draw=kdorange] coordinates {(s1,40.1) (s2,41.2) (s3,42.8)};
+          \draw[kdgray,thick,dashed] (rel axis cs:0,0.711) -- (rel axis cs:1,0.711);
+          \legend{teacher's distribution, hard labels}
+        \end{axis}
+      \end{tikzpicture}
+
+      \raggedright\scriptsize
+      Same human text, same 500 updates; only the target differs.
+      Gap: $+16.1$, $+15.6$, $+17.3$ points, every interval far from 0.
+      Dashed line: untrained student (62.0).
+    \end{column}
+    \begin{column}{0.52\textwidth}
+      \uncover<2->{
+      \begin{block}{Question (shortened)}
+        \scriptsize Janet's ducks lay 16 eggs a day. She eats 3 and bakes with 4,
+        and sells the rest at \$2 each. How much does she make? \textbf{Answer: 18}
+      \end{block}}
+      \uncover<3->{
+      \begin{block}{Hard-label student, seed 2 (116 tokens)}
+        \scriptsize\ttfamily
+        she eats 16 eggs * 3 = 48 eggs for breakfast. [...]\\
+        She has 16 eggs - 48 eggs - 64 eggs = -116 eggs left. [...]\\
+        The final answer is 232.
+      \end{block}}
+      \uncover<4->{
+      \scriptsize The untrained student solves it step by step in 262 tokens: $16 - 7 = 9$ eggs,
+      \$18. With hard labels the student copies the short GSM8K style (median answer
+      under 100 tokens instead of 217) and reasons worse.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{Still far from the teacher\hfill\ours\ \who{E1}}
+  \centering
+  \begin{tikzpicture}[x=0.19cm,y=1cm]
+    % mean accuracy over three seeds, from 38 to 94 %
+    \draw[kdgray,thick,->] (38,0) -- (94,0) node[right,font=\tiny,text=kdgray] {\%};
+    \foreach \v in {40,50,60,70,80,90} {
+      \draw[kdgray] (\v,0.1) -- (\v,-0.1);
+      \node[font=\tiny,text=kdgray,below] at (\v,-0.1) {\v};
+    }
+    \fill[kdorange] (41.4,0) circle (3pt);
+    \node[font=\scriptsize,above,align=center] at (41.4,0.2) {hard labels\\41.4};
+    \fill[kdteal!60] (57.7,0) circle (3pt);
+    \node[font=\scriptsize,above,align=center] at (54.5,0.2) {human text\\57.7};
+    \fill[kdgray] (62.0,0) circle (3pt);
+    \fill[kdteal!60] (62.1,0) circle (2pt);
+    \draw[kdgray] (62.05,0.12) -- (62.05,1.05);
+    \node[font=\scriptsize,above,align=center] at (62.05,1.05) {untrained 62.0\\teacher text 62.1};
+    \fill[kdteal] (67.6,0) circle (3pt);
+    \node[font=\scriptsize,above,align=center] at (70.5,0.2) {\textbf{on-policy}\\\textbf{67.6}};
+    \fill[kdnavy] (90.3,0) circle (3pt);
+    \node[font=\scriptsize,above,align=center] at (90.3,0.2) {teacher\\90.3};
+    % what is left to close
+    \draw[kdteal,very thick,{Bar[width=5pt]}-{Bar[width=5pt]}] (62.0,-0.75) -- (67.6,-0.75);
+    \node[font=\scriptsize,text=kdteal,left] at (61.5,-0.75) {gained: $+5.6$};
+    \draw[kdnavy,thick,{Bar[width=6pt]}-{Bar[width=6pt]}] (62.0,-1.2) -- (90.3,-1.2);
+    \node[font=\scriptsize,text=kdnavy,left] at (61.5,-1.2) {gap: 28.3};
+  \end{tikzpicture}
+
+  {\tiny\color{kdgray} Mean accuracy over the three seeds; the references have no seeds.}
+
+  \vspace{0.3cm}
+  \begin{itemize}\small
+    \item<2-> After 500 updates, on-policy distillation closes \textbf{about a fifth} of the
+          gap between the untrained student and the teacher.
+    \item<3-> In every seed the best student is still \textbf{21 to 25 points} below the
+          teacher: a 6.7$\times$ smaller model, but not yet a replacement.
+  \end{itemize}
 \end{frame}
 
 % ------------------------------------------------------------- E3

@@ -4,6 +4,7 @@ No GPU and no internet needed. Expected values are either computed by hand
 (closed-form Wilson cases) or taken from the headroom notebook output.
 """
 
+import csv
 import json
 import math
 
@@ -413,6 +414,55 @@ def test_fairness_command_line_exit_code(tmp_path, monkeypatch, capsys):
         stats.main()
     assert exc.value.code == 1
     assert "NOT FAIR" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------
+# --tables: every results table at once
+# --------------------------------------------------------------------------
+
+def test_write_tables(fake_results, tmp_path):
+    qs = [f"q{i}" for i in range(40)]
+    write_run(fake_results, "ref_student0", [rec(q, i < 25, 1 if i < 25 else 0) for i, q in enumerate(qs)])
+    write_run(fake_results, "pilot_onpolicy_s1", [rec(q, i < 10, 1) for i, q in enumerate(qs[:10])])
+    runs = load_runs(fake_results)
+    out = tmp_path / "tables"
+    written = {p.name for p in stats.write_tables(runs, out)}
+    assert written == {"results_table.csv", "arm_summary.csv", "paired_comparisons.csv",
+                       "agreement.csv", "results.md", "note_table.md"}
+
+    arms = {r["arm"]: r for r in csv.DictReader(open(out / "arm_summary.csv", encoding="utf-8"))}
+    assert arms["onpolicy"]["seeds"] == "1 2 3"
+    assert float(arms["onpolicy"]["mean_accuracy"]) == pytest.approx(32 / 40)
+    assert "pilot_onpolicy" not in arms          # pilots stay out of the main comparison
+
+    cmp_rows = list(csv.DictReader(open(out / "paired_comparisons.csv", encoding="utf-8")))
+    onp = [r for r in cmp_rows if r["arm_a"] == "onpolicy" and r["arm_b"] == "ref_student0"]
+    assert [float(r["diff"]) for r in onp] == pytest.approx([6 / 40, 7 / 40, 8 / 40])
+    # comparisons whose arms are missing (human, ref_hardlabel) are skipped, not an error
+    assert not any(r["arm_a"] == "human" for r in cmp_rows)
+
+    md = (out / "results.md").read_text(encoding="utf-8")
+    assert "| onpolicy - ref_student0 |" in md and "3 of 3" in md
+    assert "Pilot runs" in md and "pilot_onpolicy_s1" in md
+    note = (out / "note_table.md").read_text(encoding="utf-8")
+    assert "{#tbl-accuracy}" in note and "| onpolicy |" in note and "pilot" not in note
+
+
+def test_write_tables_without_teacher_has_no_agreement_file(tmp_path):
+    runs_dir = tmp_path / "runs"
+    write_run(runs_dir, "onpolicy_s1", [rec("a", True, 1), rec("b", False, 2)])
+    write_run(runs_dir, "ref_student0", [rec("a", False, 0), rec("b", False, 2)])
+    written = {p.name for p in stats.write_tables(load_runs(runs_dir), tmp_path / "t")}
+    assert "agreement.csv" not in written
+    assert "results.md" in written
+
+
+def test_tables_command_line(fake_results, tmp_path, monkeypatch, capsys):
+    out = tmp_path / "tables"
+    monkeypatch.setattr("sys.argv", ["stats", "--runs-dir", str(fake_results), "--tables", str(out)])
+    stats.main()
+    assert "results.md" in capsys.readouterr().out
+    assert (out / "results.md").exists()
 
 
 def test_command_line_prints_and_writes_csv(fake_results, tmp_path, capsys, monkeypatch):
