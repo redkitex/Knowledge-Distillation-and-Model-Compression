@@ -1,5 +1,6 @@
 % =====================================================================
-% 06-evaluation.tex -- Evaluation method.  E2 2 min (grading), E1 2 min (statistics)
+% 06-evaluation.tex -- Evaluation method.  E2 2 min (grading), E1 2 min (statistics,
+% two frames: the method, then a worked example from results/tables/)
 % Sources: src/kd/answer_extraction.py, src/kd/evaluate.py,
 %          scripts/30_evaluate.py, src/kd/stats.py,
 %          notes/theory/e1-fair-evaluation-statistics.md
@@ -75,4 +76,59 @@ is_correct = (predicted is not None
     contains 0 is ``no detectable difference''.
   \end{keybox}
   \end{uncoverenv}
+\end{frame}
+
+% ------------------------------------------------------------------
+\begin{frame}{A paired comparison, on real numbers\hfill\ours\ \who{E1}}
+  \begin{columns}[c]
+    \begin{column}{0.44\textwidth}
+      \small
+      On-policy vs teacher text, seed 2, the same 1,319 questions:
+      \vspace{0.2cm}
+
+      \centering\footnotesize
+      \renewcommand{\arraystretch}{1.4}
+      \begin{tabular}{@{}l|c|c|@{}}
+        \multicolumn{1}{c}{} & \multicolumn{1}{c}{\textbf{teacher right}} & \multicolumn{1}{c}{\textbf{teacher wrong}} \\
+        \cline{2-3}
+        \textbf{on-policy right} & 709 & \textcolor{kdteal}{\textbf{192}} \\
+        \cline{2-3}
+        \textbf{on-policy wrong} & \textcolor{kdorange}{\textbf{85}} & 333 \\
+        \cline{2-3}
+      \end{tabular}
+
+      \vspace{0.3cm}
+      \raggedright\small
+      \begin{itemize}
+        \item<2-> Only the questions where they \textbf{disagree} move the score:
+              $(192 - 85) / 1319 = +8.1$ points.
+        \item<3-> Resample the questions 10,000 times, keeping both answers
+              together: the middle 95\% is $[+5.7, +10.5]$.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.53\textwidth}
+      \centering
+      \begin{uncoverenv}<3->
+      \begin{tikzpicture}
+        \begin{axis}[kdaxis,width=7.0cm,height=5.0cm,
+            ybar,bar width=8pt,xmin=-1,xmax=13,ymin=0,
+            xlabel={on-policy $-$ teacher text (points)},
+            ylabel={resamples},
+            xtick={0,2,4,6,8,10,12},ymajorgrids]
+          \addplot[fill=kdteal!70,draw=kdteal] coordinates
+            {(4.25,12) (4.75,33) (5.25,125) (5.75,278) (6.25,490) (6.75,934)
+             (7.25,1152) (7.75,1627) (8.25,1670) (8.75,1291) (9.25,1088)
+             (9.75,635) (10.25,395) (10.75,182) (11.25,54) (11.75,27) (12.25,4)};
+          \draw[kdnavy,thick] (axis cs:5.7,0) -- (axis cs:5.7,1800);
+          \draw[kdnavy,thick] (axis cs:10.5,0) -- (axis cs:10.5,1800);
+          \draw[kdorange,thick,dashed] (axis cs:0,0) -- (axis cs:0,1800);
+          \node[font=\tiny,text=kdorange,anchor=south,rotate=90] at (axis cs:-0.3,900) {no difference};
+        \end{axis}
+      \end{tikzpicture}
+
+      {\tiny\color{kdgray} 10,000 bootstrap resamples (seed 42); lines at 2.5\% and 97.5\%.
+      Zero is far outside, so the difference is real.}
+      \end{uncoverenv}
+    \end{column}
+  \end{columns}
 \end{frame}

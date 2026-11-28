@@ -59,10 +59,14 @@ A missing number never counts as agreeing. We also report agreement only on the 
 
 - [Ours] Headroom test, 300 test questions: teacher 83.0% (Wilson 95% CI 78.3 to 86.8), student 56.7% (51.0 to 62.2), paired gap 26.3 points (bootstrap CI 21.0 to 31.7). `stats.py` gives the same Wilson intervals (checked in `tests/test_stats.py`). Source: `notebooks/archive/headroom-test.ipynb`.
 - [Ours] Planning number: on the full test set (n = 1,319), a run at about 60% accuracy has a Wilson half-width of about 2.6 points. Looking at whether two separate intervals overlap would therefore hide differences of a few points. The paired bootstrap is more sensitive, because it removes the variation that comes from question difficulty. Computed with `wilson_ci`, not measured.
-- [Ours] TODO after Nov 24: accuracy per arm and seed, paired differences, agreement with the teacher. Fill in from `results/tables/`, never by hand.
+- [Ours] Final runs, full test set: the teacher reaches 90.3% (CI 88.6 to 91.8) and the untrained student 62.0% (59.4 to 64.6), so the real gap is 28.3 points. The 300-question headroom test gave lower numbers for both (83.0% vs 56.7%), on a different subset and with a 384-token cap. Source: `results/tables/results.md`.
+- [Ours] Pairing is what makes the comparisons readable. With separate intervals of about ±2.6 points, on-policy (65.4 to 69.1%) and teacher text (60.2 to 63.5%) would look close; the paired bootstrap shows the gap clearly in seeds 2 and 3 (+8.1 [+5.7, +10.5] and +6.7 [+4.2, +9.2]). Source: `results/tables/paired_comparisons.csv`.
+- [Ours] Seeds matter as much as the test sample. The same arm moves by 2.7 to 3.9 points between seeds, more than the half-width of one interval. Seed 1 alone would have shown no significant difference between on-policy and teacher text (+1.9 [-0.6, +4.4]); seeds 2 and 3 alone would have suggested a clear one. Reporting all seeds is what keeps this honest. Source: `results/tables/results.md`.
+- [Ours] Fidelity and accuracy moved together here. On-policy students agree with the teacher's final answer on 65.0 to 68.8% of questions (61.0% before training), and on the 128 questions the teacher gets wrong they repeat its answer 17 to 23% of the time (11% before training). Hard-label students agree least (39.3 to 41.3%). Source: `results/tables/agreement.csv`.
+- [Ours] The fairness check passes for all three seeds: in every seed the four arms ran 500 steps with the same question order and the same config hash. Source: `python -m kd.stats --fair <arm>_s<seed> ...` on the `train_log.jsonl` files.
 
 ## Open questions
 
-- `evaluate.py` does not write a `question_id` yet, so runs are paired by question text. This works because every run uses the same test set, but an id would be safer (to discuss with E2).
-- Do we also want agreement between arms (e.g. onpolicy vs teacher), not only with the teacher?
-- If one seed behaves very differently from the other two, we report it as it is. We should agree on how to discuss that before the results come in, not after.
+- The bootstrap intervals cover the choice of test questions, not training noise. With three seeds we can show the spread but not estimate it well; more seeds would be the first thing to add with more compute.
+- The learning rate was chosen on the on-policy arm and on the test set. A held-out slice of the training data would have been the cleaner choice; we name it as a limitation.
+- Agreement between arms (for example on-policy vs teacher text) is not reported; it could show whether different sources teach the same answers.

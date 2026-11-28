@@ -14,10 +14,11 @@ What is in here:
   - accuracy_by_length: accuracy for short vs long answers
   - results_table / compare_arms: the tables used in the note and the slides
   - fairness_check: the pilot's "It's fair" check on the training logs
+  - write_tables: every results table at once (CSV and Markdown)
 
 From the repo root:
     python -m kd.stats                                   # table of all evaluated runs
-    python -m kd.stats --out results/tables/results_table.csv
+    python -m kd.stats --tables results/tables           # every table for the note and slides
     python -m kd.stats --fair pilot_human pilot_teacher pilot_onpolicy pilot_ref_hardlabel
 """
 
@@ -479,6 +480,162 @@ def _fmt(x, pct=True):
     return f"{100 * x:.1f}" if pct else f"{x:.0f}"
 
 
+# ---------------------------------------------------------------------------
+# All result tables in one go (used by the note and the slides)
+# ---------------------------------------------------------------------------
+
+MAIN_ARMS = ("onpolicy", "teacher", "human", "ref_hardlabel")
+REFERENCES = ("ref_teacher", "ref_student0")
+# the comparisons the note and the slides talk about, as (A, B) = A - B
+COMPARISONS = (
+    ("onpolicy", "ref_student0"),
+    ("teacher", "ref_student0"),
+    ("human", "ref_student0"),
+    ("ref_hardlabel", "ref_student0"),
+    ("onpolicy", "teacher"),
+    ("onpolicy", "human"),
+    ("teacher", "human"),
+    ("human", "ref_hardlabel"),
+    ("ref_teacher", "onpolicy"),
+)
+
+
+def _pp(x):
+    """Signed percentage points, e.g. 0.063 -> '+6.3'."""
+    return f"{100 * x:+.1f}"
+
+
+def write_tables(runs, out_dir="results/tables"):
+    """Write every results table from the evaluated runs and return the paths.
+
+    Files (all regenerated from results/runs/, never edited by hand):
+      results_table.csv       one row per run, pilots included
+      arm_summary.csv         accuracy per arm: each seed, mean and range
+      paired_comparisons.csv  the COMPARISONS above, per seed and across seeds
+      agreement.csv           agreement with the teacher per run
+      results.md              all of the above in readable form
+      note_table.md           the compact table that report/note.qmd includes
+    """
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    rows = results_table(runs)
+    by_id = {r["run_id"]: r for r in rows}
+    main_rows = [r for r in rows if r["arm"] in MAIN_ARMS and r["seed"] is not None]
+    ref_rows = [by_id[r] for r in REFERENCES if r in by_id]
+    pilot_rows = [r for r in rows if r["run_id"].startswith("pilot_")]
+    seeds = sorted({r["seed"] for r in main_rows})
+    written = []
+
+    write_csv(rows, out / "results_table.csv")
+    written.append(out / "results_table.csv")
+
+    arm_rows = []
+    for a in arm_table(main_rows + ref_rows):
+        arm_rows.append({"arm": a["arm"], "seeds": " ".join(str(s) for s in a["seeds"] if s is not None),
+                         "mean_accuracy": a["mean"], "min_accuracy": a["min"], "max_accuracy": a["max"]})
+    arm_rows.sort(key=lambda r: (MAIN_ARMS + REFERENCES).index(r["arm"])
+                  if r["arm"] in MAIN_ARMS + REFERENCES else 99)
+    write_csv(arm_rows, out / "arm_summary.csv")
+    written.append(out / "arm_summary.csv")
+
+    cmp_rows, cmp_summary = [], []
+    for a, b in COMPARISONS:
+        try:
+            res = compare_arms(runs, a, b, seeds=seeds or (1, 2, 3))
+        except ValueError:
+            continue          # one side not evaluated yet
+        for p in res["per_seed"]:
+            cmp_rows.append({"arm_a": a, "arm_b": b, "seed": p["seed"], "n": p["n"],
+                             "diff": p["diff"], "ci_low": p["ci_low"], "ci_high": p["ci_high"],
+                             "only_a_correct": p["only_a_correct"],
+                             "only_b_correct": p["only_b_correct"],
+                             "significant": p["significant"]})
+        s = res["across_seeds"]
+        cmp_summary.append({**s, "a": a, "b": b, "comparisons": res["per_seed"],
+                            "n_significant": sum(p["significant"] for p in res["per_seed"])})
+    write_csv(cmp_rows, out / "paired_comparisons.csv")
+    written.append(out / "paired_comparisons.csv")
+
+    agr_rows = []
+    teacher = runs.get("ref_teacher")
+    if teacher is not None:
+        for r in main_rows + [by_id[x] for x in ("ref_student0",) if x in by_id]:
+            agr = agreement(runs[r["run_id"]], teacher)
+            agr_rows.append({"run_id": r["run_id"], "arm": r["arm"], "seed": r["seed"], **agr})
+        write_csv(agr_rows, out / "agreement.csv")
+        written.append(out / "agreement.csv")
+
+    # ---- readable version --------------------------------------------------
+    def acc_ci(r):
+        return f"{_fmt(r['accuracy'])} [{_fmt(r['ci_low'])}, {_fmt(r['ci_high'])}]"
+
+    head = "| Arm | " + " | ".join(f"Seed {s}" for s in seeds) + " | Mean (range) |"
+    line = "|---|" + "---|" * len(seeds) + "---|"
+    arm_lines = []
+    for arm in MAIN_ARMS:
+        cells = [acc_ci(by_id[f"{arm}_s{s}"]) if f"{arm}_s{s}" in by_id else "-" for s in seeds]
+        summ = next((a for a in arm_rows if a["arm"] == arm), None)
+        mean = (f"{_fmt(summ['mean_accuracy'])} ({_fmt(summ['min_accuracy'])} to "
+                f"{_fmt(summ['max_accuracy'])})") if summ else "-"
+        arm_lines.append(f"| {arm} | " + " | ".join(cells) + f" | {mean} |")
+    for r in ref_rows:
+        # references are not trained: one value, no seeds
+        arm_lines.append(f"| {r['run_id']} | " + " | ".join(["-"] * len(seeds))
+                         + f" | {acc_ci(r)} |")
+
+    n_test = f"{ref_rows[0]['n']:,}" if ref_rows else "all"
+    md = ["# Results", "",
+          "Generated by `python -m kd.stats --tables results/tables` from `results/runs/`. "
+          "Do not edit by hand; rerun the command instead.", "",
+          f"All runs: the full GSM8K test set ({n_test} questions). "
+          "Accuracy in %, 95% Wilson intervals in brackets.", "",
+          "## Accuracy per arm and seed", "", head, line, *arm_lines, "",
+          "## Paired differences (A - B, percentage points)", "",
+          "95% paired bootstrap interval, 10,000 resamples. `*` = the interval does not contain 0.", "",
+          "| A - B | " + " | ".join(f"Seed {s}" for s in seeds) + " | Mean (range) | Significant |",
+          "|---|" + "---|" * len(seeds) + "---|---|"]
+    for c in cmp_summary:
+        per = {p["seed"]: p for p in c["comparisons"]}
+        if None in per:       # reference vs reference: one comparison, no seeds
+            cells = [f"{_pp(per[None]['diff'])} [{_pp(per[None]['ci_low'])}, {_pp(per[None]['ci_high'])}]"
+                     f"{'*' if per[None]['significant'] else ''}"] + [""] * (len(seeds) - 1)
+        else:
+            cells = [(f"{_pp(per[s]['diff'])} [{_pp(per[s]['ci_low'])}, {_pp(per[s]['ci_high'])}]"
+                      f"{'*' if per[s]['significant'] else ''}") if s in per else "-" for s in seeds]
+        md.append(f"| {c['a']} - {c['b']} | " + " | ".join(cells)
+                  + f" | {_pp(c['mean'])} ({_pp(c['min'])} to {_pp(c['max'])})"
+                  + f" | {c['n_significant']} of {len(c['comparisons'])} |")
+    if agr_rows:
+        md += ["", "## Agreement with the teacher (fidelity)", "",
+               f"Share of questions where the final number equals the teacher's. "
+               f"The teacher is wrong on {agr_rows[0]['n_teacher_wrong']} questions; on those, "
+               "agreeing means copying the teacher's mistake.", "",
+               "| Run | Agreement % | 95% CI | Agreement when the teacher is wrong % |", "|---|---|---|---|"]
+        for a in agr_rows:
+            md.append(f"| {a['run_id']} | {_fmt(a['agreement'])} | {_fmt(a['ci_low'])} to {_fmt(a['ci_high'])}"
+                      f" | {_fmt(a['agreement_when_teacher_wrong'])} |")
+    md += ["", "## Answer length and truncation", "",
+           "| Run | Mean tokens | Median tokens | Cut off at the cap % |", "|---|---|---|---|"]
+    for r in main_rows + ref_rows:
+        md.append(f"| {r['run_id']} | {_fmt(r['mean_tokens'], pct=False)} | "
+                  f"{_fmt(r['median_tokens'], pct=False)} | {_fmt(r['truncated_rate'])} |")
+    if pilot_rows:
+        md += ["", "## Pilot runs (100 steps, not part of the main comparison)", "",
+               "| Run | Accuracy % | 95% CI |", "|---|---|---|"]
+        for r in pilot_rows:
+            md.append(f"| {r['run_id']} | {_fmt(r['accuracy'])} | {_fmt(r['ci_low'])} to {_fmt(r['ci_high'])} |")
+    (out / "results.md").write_text("\n".join(md) + "\n", encoding="utf-8")
+    written.append(out / "results.md")
+
+    # ---- compact table for the note (included with {{< include >}}) ------
+    note = [": Accuracy (%) on all GSM8K test questions, with 95% Wilson intervals. "
+            "Generated by `python -m kd.stats --tables`. {#tbl-accuracy}", "",
+            head, line, *arm_lines]
+    (out / "note_table.md").write_text("\n".join(note) + "\n", encoding="utf-8")
+    written.append(out / "note_table.md")
+    return written
+
+
 def main():
     parser = argparse.ArgumentParser(description="Summarise every evaluated run.")
     parser.add_argument("--runs-dir", default="results/runs")
@@ -486,6 +643,9 @@ def main():
     parser.add_argument("--fair", nargs="+", metavar="RUN_ID",
                         help="instead of the table, check that these training runs "
                              "saw the same questions in the same order")
+    parser.add_argument("--tables", metavar="DIR",
+                        help="write every results table (CSV and Markdown) into DIR, "
+                             "e.g. results/tables")
     args = parser.parse_args()
 
     if args.fair:
@@ -504,6 +664,10 @@ def main():
     runs = load_runs(args.runs_dir)
     if not runs:
         print(f"No predictions.jsonl found under {args.runs_dir}/")
+        return
+    if args.tables:
+        for path in write_tables(runs, args.tables):
+            print(f"wrote {path}")
         return
     rows = results_table(runs)
     print(f"{'run':<22}{'n':>6}{'acc %':>8}{'95% CI':>15}{'tokens':>8}{'trunc %':>9}{'agree %':>9}")
